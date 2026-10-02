@@ -45,6 +45,8 @@ final class SiteIconView extends View {
             case "sun":canvas.drawCircle(12,12,4,paint);for(int i=0;i<8;i++){double angle=i*Math.PI/4;canvas.drawLine(12+(float)Math.cos(angle)*7,12+(float)Math.sin(angle)*7,12+(float)Math.cos(angle)*10,12+(float)Math.sin(angle)*10,paint);}break;
             case "monitor":canvas.drawRoundRect(2,3,22,17,2,2,paint);path(canvas,12,17,12,21);path(canvas,8,21,16,21);break;
             case "check":path(canvas,4,12,9,17,20,6);break;
+            case "verified":
+                for(int i=0;i<12;i++){double angle=i*Math.PI/6-Math.PI/2;float radius=i%2==0?10f:8.8f;float px=12+(float)Math.cos(angle)*radius,py=12+(float)Math.sin(angle)*radius;if(i==0)p.moveTo(px,py);else p.lineTo(px,py);}p.close();canvas.drawPath(p,paint);paint.setStrokeWidth(2.2f);path(canvas,7.4f,12.3f,10.4f,15.1f,16.7f,8.7f);break;
             case "zap":p.moveTo(13,2);p.lineTo(4,13);p.lineTo(11,13);p.lineTo(10,22);p.lineTo(20,10);p.lineTo(13,10);p.close();paint.setStyle(Paint.Style.FILL);canvas.drawPath(p,paint);break;
             case "gem":path(canvas,7,3,17,3,22,9,12,22,2,9,7,3);path(canvas,2,9,22,9);path(canvas,7,3,8,9,12,22,16,9,17,3);break;
             case "gamepad":canvas.drawRoundRect(2,6,22,19,4,4,paint);path(canvas,5,12,11,12);path(canvas,8,9,8,15);canvas.drawCircle(16,11,.7f,paint);canvas.drawCircle(19,14,.7f,paint);break;
