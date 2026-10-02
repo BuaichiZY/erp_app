@@ -1,6 +1,6 @@
 # ERP Android
 
-ERP 1.0.0-beta，适配 [erp.sex](https://erp.sex) 的非官方 Android 原生客户端。最低支持 Android 8.0（API 26），当前目标 API 35。
+ERP 1.0.0-beta，适配 [erp.sex](https://erp.sex) 的非官方 Android 原生客户端。最低支持 Android 8.0（API 26）。
 
 首次启动会显示应用说明。“关于 ERP”的“开源项目”会在浏览器中打开本仓库。界面支持简体中文、繁体中文、日语、英语及韩语；默认自动识别手机语言，也可在设置里手动选择。
 
