@@ -105,7 +105,7 @@ final class PullRefreshLayout extends FrameLayout {
     }
     private void beginRefresh() {
         stopSettling(); refreshing = true; shown = 1; invalidate();
-        announceForAccessibility("正在刷新");
+        announceForAccessibility(UiStrings.t("正在刷新"));
         refresh.run();
     }
     void finishRefresh() { refreshing = false; hideIndicator(); }
@@ -127,12 +127,12 @@ final class PullRefreshLayout extends FrameLayout {
         float angle = refreshing?(SystemClock.uptimeMillis()%1000)*.36f:270;
         canvas.drawArc(-73*density,-8*density,-57*density,8*density,angle,refreshing?260:Math.max(30,shown*300),false,paint);
         paint.setStyle(Paint.Style.FILL);paint.setColor(palette.text);paint.setTextSize(13*density);paint.setTextAlign(Paint.Align.CENTER);
-        canvas.drawText(refreshing?"正在刷新":gesture.ready()?"松开刷新":"下拉刷新",10*density,4*density,paint);
+        canvas.drawText(refreshing?UiStrings.t("正在刷新"):gesture.ready()?UiStrings.t("松开刷新"):UiStrings.t("下拉刷新"),10*density,4*density,paint);
         canvas.restore(); if (refreshing) postInvalidateOnAnimation();
     }
     @Override public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
         super.onInitializeAccessibilityNodeInfo(info);
-        info.addAction(new AccessibilityNodeInfo.AccessibilityAction(REFRESH_ACTION,"刷新当前页面"));
+        info.addAction(new AccessibilityNodeInfo.AccessibilityAction(REFRESH_ACTION,UiStrings.t("刷新当前页面")));
     }
     @Override public boolean performAccessibilityAction(int action, Bundle arguments) {
         if (action==REFRESH_ACTION && !refreshing && refresh!=null && available.getAsBoolean()) { beginRefresh(); return true; }

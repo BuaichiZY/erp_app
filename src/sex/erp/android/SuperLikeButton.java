@@ -16,7 +16,7 @@ final class SuperLikeButton extends FrameLayout {
     private ThemePalette palette;
     private boolean visible;
     SuperLikeButton(Context context,ThemePalette palette,Runnable action){
-        super(context);this.palette=palette;setWillNotDraw(false);setContentDescription("超级喜欢");setFocusable(true);setOnClickListener(v->action.run());
+        super(context);this.palette=palette;setWillNotDraw(false);setContentDescription(UiStrings.t("超级喜欢"));setFocusable(true);setOnClickListener(v->action.run());
         int size=Math.round(24*getResources().getDisplayMetrics().density);
         addView(new SiteIconView(context,"star",palette.pop?0xff141414:0xfff5b82e,true),new LayoutParams(size,size,Gravity.CENTER));
     }

@@ -1,6 +1,8 @@
 """Run the pure Java regression checks without an Android device or SDK."""
 import os
 from pathlib import Path
+import json
+import re
 import shutil
 import subprocess
 
@@ -15,10 +17,26 @@ output = ROOT / 'build' / 'tests'
 output.mkdir(parents=True, exist_ok=True)
 names = ('ChatPresentation', 'DiscoverFilters', 'EnergyTime', 'LikesRules',
          'PostRules', 'ProfileText', 'PullRefreshGesture', 'ReactionRules',
-         'ReadRefreshBatch', 'SwipeGesturePolicy', 'ThemePalette', 'WebSocketFrames')
+         'ReadRefreshBatch', 'SwipeGesturePolicy', 'ThemePalette', 'WebSocketFrames',
+         'LanguageRules', 'UiStrings')
 sources = [ROOT / 'src' / 'sex' / 'erp' / 'android' / (name + '.java') for name in names]
 tests = sorted((ROOT / 'tests').glob('*Test.java'))
 subprocess.run([javac, '-encoding', 'UTF-8', '--release', '8', '-d', str(output),
                 *map(str, sources + tests)], check=True)
 for test in tests:
     subprocess.run([java, '-cp', str(output), 'sex.erp.android.' + test.stem], check=True)
+
+literal = re.compile(r'"((?:\\.|[^"\\])*)"')
+authored=set()
+for source in (ROOT / 'src').rglob('*.java'):
+    if source.name in {'LanguageRules.java', 'UiStrings.java', 'AppLanguage.java'}:
+        continue
+    for match in literal.finditer(source.read_text(encoding='utf-8')):
+        if re.search(r'[\u3400-\u9fff]', match.group(1)):
+            authored.add(json.loads(match.group()))
+for language in ('en', 'ja', 'ko', 'zh_hant'):
+    translations=json.loads((ROOT / 'res' / 'raw' / ('ui_' + language + '.json')).read_text(encoding='utf-8'))
+    missing=authored-translations.keys()
+    if missing:
+        raise AssertionError(f'{language}: untranslated interface literals: {sorted(missing)[:8]}')
+    print(f'{language}: {len(authored)} interface literals covered')

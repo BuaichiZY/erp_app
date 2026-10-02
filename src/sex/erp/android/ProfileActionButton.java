@@ -15,7 +15,7 @@ final class ProfileActionButton extends LinearLayout {
     ProfileActionButton(Context context,ThemePalette palette,String action,Runnable click){
         super(context);this.action=action;this.palette=palette;setWillNotDraw(false);setGravity(Gravity.CENTER);setFocusable(true);setClickable(true);setOnClickListener(v->click.run());
         boolean superlike=action.equals("superlike"),like=action.equals("like");int color=like?Color.WHITE:palette.text;float density=getResources().getDisplayMetrics().density;
-        String title=superlike?"超级喜欢":like?"喜欢":"跳过";setContentDescription(title);int iconSize=Math.round(16*density);
+        String title=superlike?UiStrings.t("超级喜欢"):like?UiStrings.t("喜欢"):UiStrings.t("跳过");setContentDescription(title);int iconSize=Math.round(16*density);
         addView(new SiteIconView(context,superlike?"star":like?"heart":"close",color,false),new LayoutParams(iconSize,iconSize));
         TextView label=new TextView(context);label.setText(title);label.setTextColor(color);label.setTextSize(14);label.setTypeface(null,Typeface.BOLD);label.setSingleLine();LayoutParams lp=new LayoutParams(-2,-2);lp.leftMargin=Math.round(6*density);addView(label,lp);
         if(superlike){((SiteIconView)getChildAt(0)).tint(0xff24251d);label.setTextColor(0xff24251d);}

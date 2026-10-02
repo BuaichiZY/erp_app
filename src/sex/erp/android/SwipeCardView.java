@@ -21,9 +21,9 @@ final class SwipeCardView extends FrameLayout {
     SwipeCardView(Context context,View content,Consumer<String> action){
         super(context);this.action=action;density=getResources().getDisplayMetrics().density;slop=ViewConfiguration.get(context).getScaledTouchSlop();
         setClipChildren(false);setClipToPadding(false);addView(content,new LayoutParams(-1,-1));
-        like=stamp("喜欢",0xff4ade80,Gravity.TOP|Gravity.LEFT,-12,24);
-        pass=stamp("跳过",0xffff5a4e,Gravity.TOP|Gravity.RIGHT,12,24);
-        superlike=stamp("超喜欢",0xffffd447,Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL,0,148);
+        like=stamp(UiStrings.t("喜欢"),0xff4ade80,Gravity.TOP|Gravity.LEFT,-12,24);
+        pass=stamp(UiStrings.t("跳过"),0xffff5a4e,Gravity.TOP|Gravity.RIGHT,12,24);
+        superlike=stamp(UiStrings.t("超喜欢"),0xffffd447,Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL,0,148);
     }
     private TextView stamp(String label,int color,int gravity,float rotate,int margin){
         TextView t=new TextView(getContext());t.setText(label);t.setTextColor(color);t.setTextSize(29);t.setTypeface(null,Typeface.BOLD);t.setPadding(dp(12),dp(4),dp(12),dp(4));

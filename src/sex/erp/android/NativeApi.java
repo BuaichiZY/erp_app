@@ -54,7 +54,7 @@ final class NativeApi {
             Object result=null; Failure error=null;
             try { result=request(method,path,body); }
             catch(Failure e) { error=e; }
-            catch(Exception e) { error=new Failure(0,"NETWORK","网络连接失败，请检查网络后重试"); }
+            catch(Exception e) { error=new Failure(0,"NETWORK",UiStrings.t("网络连接失败，请检查网络后重试")); }
             Object value=result; Failure problem=error;
             ui.post(() -> {
                 ReadRefreshBatch previous=readScope;readScope=batch;
@@ -74,30 +74,30 @@ final class NativeApi {
                 ensureCsrf();
                 String mime=context.getContentResolver().getType(file);
                 if(mime==null&&"file".equals(file.getScheme()))mime=android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(android.webkit.MimeTypeMap.getFileExtensionFromUrl(file.toString()));
-                if(mime==null || !(mime.startsWith("image/")||mime.startsWith("audio/")))throw new Failure(0,"UNSUPPORTED_MEDIA","请选择图片或语音文件");
+                if(mime==null || !(mime.startsWith("image/")||mime.startsWith("audio/")))throw new Failure(0,"UNSUPPORTED_MEDIA",UiStrings.t("请选择图片或语音文件"));
                 boolean audio="chat_voice".equals(purpose)||"voice_card".equals(purpose);
-                if(audio!=mime.startsWith("audio/"))throw new Failure(0,"UNSUPPORTED_MEDIA","文件类型与附件类型不匹配");
+                if(audio!=mime.startsWith("audio/"))throw new Failure(0,"UNSUPPORTED_MEDIA",UiStrings.t("文件类型与附件类型不匹配"));
                 String rating=options.optString("rating");
-                if(!Arrays.asList("general","suggestive","r18").contains(rating))throw new Failure(0,"VALIDATION_FAILED","请选择内容分级");
-                if(!audio&&options.optBoolean("realPerson")&&!"general".equals(rating))throw new Failure(0,"REAL_PERSON_NSFW","真人图片仅支持全年龄分级");
+                if(!Arrays.asList("general","suggestive","r18").contains(rating))throw new Failure(0,"VALIDATION_FAILED",UiStrings.t("请选择内容分级"));
+                if(!audio&&options.optBoolean("realPerson")&&!"general".equals(rating))throw new Failure(0,"REAL_PERSON_NSFW",UiStrings.t("真人图片仅支持全年龄分级"));
                 ByteArrayOutputStream bytes=new ByteArrayOutputStream();
                 try(InputStream input=context.getContentResolver().openInputStream(file)) {
                     if(input==null)throw new IOException("Missing file");byte[] buffer=new byte[8192];int n;
-                    while((n=input.read(buffer))!=-1){if(bytes.size()+n>20*1024*1024)throw new Failure(413,"FILE_TOO_LARGE","文件不能超过 20 MB");bytes.write(buffer,0,n);}
+                    while((n=input.read(buffer))!=-1){if(bytes.size()+n>20*1024*1024)throw new Failure(413,"FILE_TOO_LARGE",UiStrings.t("文件不能超过 20 MB"));bytes.write(buffer,0,n);}
                 }
                 if(!audio){
-                    if(!Arrays.asList("image/jpeg","image/png","image/webp","image/gif").contains(mime))throw new Failure(0,"UNSUPPORTED_MEDIA","请选择 JPEG、PNG、WebP 或 GIF 图片");
+                    if(!Arrays.asList("image/jpeg","image/png","image/webp","image/gif").contains(mime))throw new Failure(0,"UNSUPPORTED_MEDIA",UiStrings.t("请选择 JPEG、PNG、WebP 或 GIF 图片"));
                     byte[] source=bytes.toByteArray();BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(source,0,source.length,bounds);
-                    if(bounds.outWidth<=0||bounds.outHeight<=0)throw new Failure(0,"UNSUPPORTED_MEDIA","图片无法读取");
+                    if(bounds.outWidth<=0||bounds.outHeight<=0)throw new Failure(0,"UNSUPPORTED_MEDIA",UiStrings.t("图片无法读取"));
                     // Like the website, upload a resized JPEG and strip embedded metadata.
                     int maxEdge=options.optBoolean("original")?4096:1600;bounds.inJustDecodeBounds=false;bounds.inSampleSize=1;while(Math.max(bounds.outWidth,bounds.outHeight)/bounds.inSampleSize>maxEdge*2)bounds.inSampleSize*=2;
-                    Bitmap decoded=BitmapFactory.decodeByteArray(source,0,source.length,bounds);if(decoded==null)throw new Failure(0,"UNSUPPORTED_MEDIA","图片无法读取");
+                    Bitmap decoded=BitmapFactory.decodeByteArray(source,0,source.length,bounds);if(decoded==null)throw new Failure(0,"UNSUPPORTED_MEDIA",UiStrings.t("图片无法读取"));
                     decoded=ImageOrientation.upright(context,file,decoded);
                     float scale=Math.min(1f,(float)maxEdge/Math.max(decoded.getWidth(),decoded.getHeight()));Bitmap resized=Bitmap.createScaledBitmap(decoded,Math.max(1,Math.round(decoded.getWidth()*scale)),Math.max(1,Math.round(decoded.getHeight()*scale)),true);
                     Bitmap flattened=Bitmap.createBitmap(resized.getWidth(),resized.getHeight(),Bitmap.Config.ARGB_8888);android.graphics.Canvas canvas=new android.graphics.Canvas(flattened);canvas.drawColor(android.graphics.Color.WHITE);canvas.drawBitmap(resized,0,0,null);bytes.reset();flattened.compress(Bitmap.CompressFormat.JPEG,options.optBoolean("original")?92:85,bytes);flattened.recycle();if(resized!=decoded)resized.recycle();decoded.recycle();mime="image/jpeg";
                 }else{
                     android.media.MediaMetadataRetriever metadata=new android.media.MediaMetadataRetriever();
-                    try{metadata.setDataSource(context,file);String length=metadata.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION);long milliseconds=length==null?0:Long.parseLong(length);if(milliseconds<1000||milliseconds>121000)throw new Failure(0,"AUDIO_DURATION_INVALID","语音长度须为 1 秒至 2 分钟");}finally{metadata.release();}
+                    try{metadata.setDataSource(context,file);String length=metadata.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION);long milliseconds=length==null?0:Long.parseLong(length);if(milliseconds<1000||milliseconds>121000)throw new Failure(0,"AUDIO_DURATION_INVALID",UiStrings.t("语音长度须为 1 秒至 2 分钟"));}finally{metadata.release();}
                 }
                 String boundary="ERP"+UUID.randomUUID().toString().replace("-","");
                 HttpsURLConnection connection=(HttpsURLConnection)new URL(ORIGIN+"/api/v1/media").openConnection();
@@ -120,10 +120,10 @@ final class NativeApi {
                     for(Map.Entry<String,List<String>> entry:connection.getHeaderFields().entrySet())if("Set-Cookie".equalsIgnoreCase(entry.getKey()))for(String v:entry.getValue())cookies.setCookie(ORIGIN+"/api/v1/",v);
                     cookies.flush();InputStream stream=status>=400?connection.getErrorStream():connection.getInputStream();
                     JSONObject response=new JSONObject(stream==null?"{}":read(stream,1024*1024));
-                    if(status>=300){JSONObject detail=response.optJSONObject("error");throw new Failure(status,detail==null?"UPLOAD_FAILED":detail.optString("code"),detail==null?"上传失败":detail.optString("message","上传失败"));}
+                    if(status>=300){JSONObject detail=response.optJSONObject("error");throw new Failure(status,detail==null?"UPLOAD_FAILED":detail.optString("code"),detail==null?UiStrings.t("上传失败"):detail.optString("message",UiStrings.t("上传失败")));}
                     result=response;
                 }finally{connection.disconnect();}
-            }catch(Failure e){error=e;}catch(OutOfMemoryError e){error=new Failure(0,"FILE_TOO_LARGE","图片过大，请选择较小的图片");}catch(Exception e){error=new Failure(0,"NETWORK","上传失败，请检查网络或文件格式");}
+            }catch(Failure e){error=e;}catch(OutOfMemoryError e){error=new Failure(0,"FILE_TOO_LARGE",UiStrings.t("图片过大，请选择较小的图片"));}catch(Exception e){error=new Failure(0,"NETWORK",UiStrings.t("上传失败，请检查网络或文件格式"));}
             Object value=result;Failure problem=error;ui.post(()->callback.complete(value,problem));
         });
     }
@@ -165,10 +165,10 @@ final class NativeApi {
             String text=stream==null?"":read(stream,8*1024*1024);
             Object result;
             try { result=text.startsWith("[")?new JSONArray(text):text.isEmpty()?new JSONObject():new JSONObject(text); }
-            catch(Exception e) { throw new Failure(status,"NON_JSON","网站返回了验证页面，请稍后重试"); }
+            catch(Exception e) { throw new Failure(status,"NON_JSON",UiStrings.t("网站返回了验证页面，请稍后重试")); }
             if(status>=400 || status>=300) {
                 JSONObject detail=result instanceof JSONObject?((JSONObject)result).optJSONObject("error"):null;
-                throw new Failure(status,detail==null?"HTTP_"+status:detail.optString("code"),detail==null?"网站返回 "+status:detail.optString("message","操作失败"));
+                throw new Failure(status,detail==null?"HTTP_"+status:detail.optString("code"),detail==null?UiStrings.t("网站返回 ")+status:detail.optString("message",UiStrings.t("操作失败")));
             }
             return result;
         } finally { connection.disconnect(); }
