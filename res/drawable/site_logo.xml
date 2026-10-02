@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Original erp.sex logo geometry from the site's public client bundle. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="28dp" android:height="28dp" android:viewportWidth="444" android:viewportHeight="444">
+    <group android:translateX="-34" android:translateY="-53">
+        <path android:pathData="M120 78H392A64 64 0 0 1 456 142V334A64 64 0 0 1 404 396.9L414 448C417 466 404 472 391 460L330 398H120A64 64 0 0 1 56 334V142A64 64 0 0 1 120 78Z" android:fillColor="#00000000" android:strokeColor="#16121b" android:strokeWidth="40" android:strokeLineJoin="round" />
+        <path android:pathData="M120 78H392A64 64 0 0 1 456 142V334A64 64 0 0 1 404 396.9L414 448C417 466 404 472 391 460L330 398H120A64 64 0 0 1 56 334V142A64 64 0 0 1 120 78Z" android:fillColor="#ffffff" />
+        <path android:pathData="M187 130H143V194H187M143 162H179M235 194V130H261A16 16 0 0 1 261 162H235M257 162L279 194M327 194V130H353A16 16 0 0 1 353 162H327" android:fillColor="#00000000" android:strokeColor="#16121b" android:strokeWidth="26" android:strokeLineCap="round" android:strokeLineJoin="round" />
+        <path android:pathData="M132 236H380A40 40 0 0 1 420 276V324A40 40 0 0 1 380 364H132A40 40 0 0 1 92 324V276A40 40 0 0 1 132 236Z" android:fillColor="#16121b" />
+        <path android:pathData="M185 275C180 269 173 266 164 266C152 266 143 272 143 283C143 307 187 291 187 313C187 324 178 330 165 330C155 330 146 326 141 320M279 266H235V330H279M235 298H271M327 266L371 330M371 266L327 330" android:fillColor="#00000000" android:strokeColor="#ffffff" android:strokeWidth="26" android:strokeLineCap="round" android:strokeLineJoin="round" />
+    </group>
+</vector>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Vector recreation of the tab favicon supplied by the user. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:pathData="M27,0H81A27,27 0,0 1,108 27V81A27,27 0,0 1,81 108H27A27,27 0,0 1,0 81V27A27,27 0,0 1,27 0Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="0" android:startY="0" android:endX="108" android:endY="108" android:startColor="#FF5FA2" android:endColor="#8B5CF6" />
+        </aapt:attr>
+    </path>
+    <group android:scaleX="1.5" android:scaleY="1.5" android:pivotX="54" android:pivotY="54">
+        <path android:fillColor="#FFFFFF" android:pathData="M54,72C51,69 34,57 34,46C34,34 48,32 54,42C60,32 74,34 74,46C74,57 57,69 54,72Z" />
+    </group>
+</vector>

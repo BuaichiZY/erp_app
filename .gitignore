@@ -1,0 +1,19 @@
+/build/
+/dist/
+/.signing/
+*.apk
+*.apk.idsig
+*.apk.sha256
+*.p12
+*.jks
+*.keystore
+password.txt
+local.properties
+.env
+.env.*
+__pycache__/
+*.pyc
+# Local screenshots and recordings contain account data and are not source assets.
+/*.jpg
+/*.png
+*.mp4
