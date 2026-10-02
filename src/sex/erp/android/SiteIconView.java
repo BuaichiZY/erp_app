@@ -26,6 +26,7 @@ final class SiteIconView extends View {
                 paint.setStyle(Paint.Style.FILL);p.moveTo(4,1);p.lineTo(19,1);p.quadTo(22,1,22,4);p.lineTo(22,17);p.quadTo(22,20,19,20);p.lineTo(19,24);p.lineTo(14,20);p.lineTo(4,20);p.quadTo(1,20,1,17);p.lineTo(1,4);p.quadTo(1,1,4,1);canvas.drawPath(p,paint);
                 paint.setColor(0xff101115);canvas.drawRoundRect(3,11,20,18,1,1,paint);paint.setTypeface(Typeface.create("monospace",Typeface.BOLD));paint.setTextAlign(Paint.Align.CENTER);paint.setTextSize(7.2f);canvas.drawText("ERP",11.5f,9.2f,paint);paint.setColor(color);canvas.drawText("SEX",11.5f,16.7f,paint);break;
             case "compass":canvas.drawCircle(12,12,9,paint);path(canvas,16,8,14,14,8,16,10,10,16,8);break;
+            case "scan":path(canvas,3,9,3,3,9,3);path(canvas,15,3,21,3,21,9);path(canvas,21,15,21,21,15,21);path(canvas,9,21,3,21,3,15);canvas.drawRect(8,8,11,11,paint);canvas.drawRect(14,8,17,11,paint);canvas.drawRect(8,14,11,17,paint);path(canvas,14,14,17,14,17,17);break;
             case "heart":
                 p.moveTo(12,21);p.cubicTo(10,19,2,13,2,7);p.cubicTo(2,1,9,1,12,6);p.cubicTo(15,1,22,1,22,7);p.cubicTo(22,13,14,19,12,21);p.close();if(filled)paint.setStyle(Paint.Style.FILL);canvas.drawPath(p,paint);break;
             case "chat":p.moveTo(21,11);p.cubicTo(21,17,17,21,11,21);p.quadTo(8,21,6,20);p.lineTo(2,22);p.lineTo(3.5f,17);p.quadTo(2,15,2,11);p.cubicTo(2,5,6,2,12,2);p.cubicTo(18,2,21,5,21,11);canvas.drawPath(p,paint);break;

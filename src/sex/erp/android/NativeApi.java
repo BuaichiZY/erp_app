@@ -16,6 +16,7 @@ import java.io.*;
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.security.MessageDigest;
 import javax.net.ssl.HttpsURLConnection;
 
 /** Native HTTPS requests. No page scraping or WebView is used for application data. */
@@ -34,11 +35,12 @@ final class NativeApi {
     private final LruCache<String,Bitmap> imageCache = new LruCache<String,Bitmap>(12*1024*1024) {
         @Override protected int sizeOf(String key,Bitmap value) { return value.getByteCount(); }
     };
+    private final File profileImageCache;
     final String userAgent;
     volatile String mode = "sfw";
     volatile String language = "zh-CN";
     private ReadRefreshBatch readScope;
-    NativeApi(Context context) { userAgent=WebSettings.getDefaultUserAgent(context); cookies.setAcceptCookie(true); }
+    NativeApi(Context context) { userAgent=WebSettings.getDefaultUserAgent(context); cookies.setAcceptCookie(true);profileImageCache=new File(context.getCacheDir(),"profile-images");profileImageCache.mkdirs(); }
 
     // Scope only reads started by this action or its callbacks, not background polling.
     void readBatch(Runnable action, Runnable complete) {
@@ -200,7 +202,30 @@ final class NativeApi {
         String url=thumbnail?media.optString("thumbUrl",media.optString("url")):media.optString("url",media.optString("thumbUrl"));
         imageUrl(view,url);
     }
-    void imageUrl(ImageView view,String url) {
+    void imageCached(ImageView view,JSONObject media,boolean thumbnail){
+        if(media==null||!"show".equals(media.optString("view","show")))return;
+        String url=thumbnail?media.optString("thumbUrl",media.optString("url")):media.optString("url",media.optString("thumbUrl"));
+        imageUrl(view,url,true);
+    }
+    void shareCardPhoto(String id,java.util.function.Consumer<Bitmap> done) {
+        if(id==null||id.isEmpty()){ui.post(()->done.accept(null));return;}
+        images.execute(()->{
+            Bitmap bitmap=null;HttpsURLConnection connection=null;
+            try{
+                connection=(HttpsURLConnection)new URL(ORIGIN+"/api/v1/me/share-cards/photo/"+Uri.encode(id)).openConnection();
+                connection.setConnectTimeout(15000);connection.setReadTimeout(25000);connection.setInstanceFollowRedirects(false);
+                connection.setRequestProperty("User-Agent",userAgent);String cookie=cookies.getCookie(ORIGIN+"/api/v1/");if(cookie!=null)connection.setRequestProperty("Cookie",cookie);
+                if(connection.getResponseCode()!=200)throw new IOException("Share photo unavailable");
+                try(InputStream input=connection.getInputStream();ByteArrayOutputStream output=new ByteArrayOutputStream()){
+                    byte[] buffer=new byte[8192];int n;while((n=input.read(buffer))!=-1){if(output.size()+n>16*1024*1024)throw new IOException("Image too large");output.write(buffer,0,n);}
+                    byte[] bytes=output.toByteArray();BitmapFactory.Options options=new BitmapFactory.Options();options.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(bytes,0,bytes.length,options);options.inSampleSize=1;while(options.outWidth/options.inSampleSize>1800||options.outHeight/options.inSampleSize>2200)options.inSampleSize*=2;options.inJustDecodeBounds=false;bitmap=BitmapFactory.decodeByteArray(bytes,0,bytes.length,options);
+                }
+            }catch(Exception ignored){}finally{if(connection!=null)connection.disconnect();}
+            Bitmap result=bitmap;ui.post(()->done.accept(result));
+        });
+    }
+    void imageUrl(ImageView view,String url) { imageUrl(view,url,false); }
+    private void imageUrl(ImageView view,String url,boolean disk) {
         Uri uri=Uri.parse(url);
         if(!"https".equals(uri.getScheme())) return;
         String host=uri.getHost();
@@ -211,6 +236,8 @@ final class NativeApi {
         if(cached!=null) { deliverImage(view,cached); return; }
         images.execute(() -> {
             try {
+                File cachedFile=disk?imageFile(url):null;
+                if(cachedFile!=null&&cachedFile.isFile()&&System.currentTimeMillis()-cachedFile.lastModified()<7L*24*60*60*1000){Bitmap saved=BitmapFactory.decodeFile(cachedFile.getAbsolutePath());if(saved!=null){imageCache.put(url,saved);ui.post(()->{if(url.equals(view.getTag()))deliverImage(view,saved);});return;}}
                 HttpsURLConnection connection=(HttpsURLConnection)new URL(url).openConnection();
                 connection.setConnectTimeout(15000);connection.setReadTimeout(20000);
                 connection.setInstanceFollowRedirects(false);
@@ -228,10 +255,13 @@ final class NativeApi {
                 options.inJustDecodeBounds=false;
                 Bitmap bitmap=BitmapFactory.decodeByteArray(data,0,data.length,options);
                 if(bitmap==null)throw new IOException("Invalid image");
+                if(cachedFile!=null){try{profileImageCache.mkdirs();try(FileOutputStream out=new FileOutputStream(cachedFile)){out.write(data);}trimImageCache();}catch(IOException ignored){}}
                 imageCache.put(url,bitmap);ui.post(() -> { if(url.equals(view.getTag()))deliverImage(view,bitmap); });
             } catch(Exception ignored) {ui.post(()->{if(url.equals(view.getTag())&&view instanceof AnimatedPhotoView)((AnimatedPhotoView)view).failed();});}
         });
     }
+    private File imageFile(String url)throws Exception{byte[] digest=MessageDigest.getInstance("SHA-256").digest(url.getBytes("UTF-8"));StringBuilder name=new StringBuilder();for(byte part:digest)name.append(String.format(java.util.Locale.ROOT,"%02x",part&255));return new File(profileImageCache,name+".img");}
+    private void trimImageCache(){File[] files=profileImageCache.listFiles();if(files==null)return;Arrays.sort(files,Comparator.comparingLong(File::lastModified));long size=0;int count=files.length;for(File file:files)size+=file.length();for(File file:files){if(size<=32L*1024*1024&&count<=80)break;long bytes=file.length();if(file.delete()){size-=bytes;count--;}}}
     private void deliverImage(ImageView view,Bitmap bitmap){if(view instanceof AnimatedPhotoView)((AnimatedPhotoView)view).ready(bitmap);else view.setImageBitmap(bitmap);}
     void close() { requests.shutdownNow();images.shutdownNow(); }
     static JSONObject object(Object result) { return result instanceof JSONObject?(JSONObject)result:new JSONObject(); }

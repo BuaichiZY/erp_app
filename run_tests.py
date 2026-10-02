@@ -18,13 +18,20 @@ output.mkdir(parents=True, exist_ok=True)
 names = ('ChatPresentation', 'DiscoverFilters', 'EnergyTime', 'LikesRules',
          'PostRules', 'ProfileText', 'PullRefreshGesture', 'ReactionRules',
          'ReadRefreshBatch', 'SwipeGesturePolicy', 'ThemePalette', 'WebSocketFrames',
-         'LanguageRules', 'UiStrings')
+         'LanguageRules', 'UiStrings', 'ReleaseVersion')
 sources = [ROOT / 'src' / 'sex' / 'erp' / 'android' / (name + '.java') for name in names]
-tests = sorted((ROOT / 'tests').glob('*Test.java'))
+tests = sorted(test for test in (ROOT / 'tests').glob('*Test.java') if test.stem != 'QrRoundTripTest')
 subprocess.run([javac, '-encoding', 'UTF-8', '--release', '8', '-d', str(output),
                 *map(str, sources + tests)], check=True)
 for test in tests:
     subprocess.run([java, '-cp', str(output), 'sex.erp.android.' + test.stem], check=True)
+
+qr_sources=sorted((ROOT / 'src' / 'io' / 'nayuki' / 'qrcodegen').glob('*.java'))
+zxing=ROOT / 'third_party' / 'zxing-core-3.5.3.jar'
+subprocess.run([javac, '-encoding', 'UTF-8', '--release', '8', '-cp', str(zxing),
+                '-d', str(output), *map(str, qr_sources), str(ROOT / 'tests' / 'QrRoundTripTest.java')], check=True)
+subprocess.run([java, '-cp', str(output) + os.pathsep + str(zxing),
+                'sex.erp.android.QrRoundTripTest'], check=True)
 
 literal = re.compile(r'"((?:\\.|[^"\\])*)"')
 authored=set()

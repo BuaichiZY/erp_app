@@ -24,6 +24,7 @@ if not (TOOLS / ('aapt2' + EXE)).exists():
     TOOLS = max(candidates, key=lambda p: tuple(int(x) for x in re.findall(r'\d+', p.parent.name))).parent
 platforms = SDK_ROOT / ('platforms' if (SDK_ROOT / 'platforms').exists() else 'platform')
 ANDROID = platforms / 'android-35' / 'android.jar'
+ZXING = ROOT / 'third_party' / 'zxing-core-3.5.3.jar'
 if not ANDROID.exists():
     raise SystemExit('Install Android SDK Platform android-35.')
 jdk_setting = os.environ.get('ERP_JAVA_HOME') or os.environ.get('JAVA_HOME')
@@ -50,14 +51,14 @@ for stale in classes.rglob('*.class'):
     stale.resolve().relative_to(BUILD.resolve())
     stale.unlink()
 run([JAVA_HOME / 'bin' / ('javac' + EXE), '-encoding', 'UTF-8', '--release', '8',
-     '-classpath', ANDROID, '-d', classes, *sorted((ROOT / 'src').rglob('*.java'))])
+     '-classpath', str(ANDROID) + os.pathsep + str(ZXING), '-d', classes, *sorted((ROOT / 'src').rglob('*.java'))])
 with zipfile.ZipFile(BUILD / 'classes.jar', 'w', zipfile.ZIP_DEFLATED) as archive:
     for file in classes.rglob('*.class'):
         archive.write(file, file.relative_to(classes).as_posix())
 dex = BUILD / 'dex'
 dex.mkdir(exist_ok=True)
 run([JAVA, '-cp', TOOLS / 'lib' / 'd8.jar', 'com.android.tools.r8.D8', '--release',
-     '--min-api', '26', '--lib', ANDROID, '--output', dex, BUILD / 'classes.jar'])
+     '--min-api', '26', '--lib', ANDROID, '--output', dex, BUILD / 'classes.jar', ZXING])
 with zipfile.ZipFile(BUILD / 'base.apk', 'a', zipfile.ZIP_DEFLATED) as archive:
     archive.write(dex / 'classes.dex', 'classes.dex')
 run([TOOLS / ('zipalign' + EXE), '-f', '4', BUILD / 'base.apk', BUILD / 'aligned.apk'])
