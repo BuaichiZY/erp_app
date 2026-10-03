@@ -233,11 +233,11 @@ final class NativeApi {
         view.setTag(url);
         if(view instanceof AnimatedPhotoView)((AnimatedPhotoView)view).loading();
         Bitmap cached=imageCache.get(url);
-        if(cached!=null) { deliverImage(view,cached); return; }
+        if(cached!=null) { deliverCachedImage(view,cached); return; }
         images.execute(() -> {
             try {
                 File cachedFile=disk?imageFile(url):null;
-                if(cachedFile!=null&&cachedFile.isFile()&&System.currentTimeMillis()-cachedFile.lastModified()<7L*24*60*60*1000){Bitmap saved=BitmapFactory.decodeFile(cachedFile.getAbsolutePath());if(saved!=null){imageCache.put(url,saved);ui.post(()->{if(url.equals(view.getTag()))deliverImage(view,saved);});return;}}
+                if(cachedFile!=null&&cachedFile.isFile()&&System.currentTimeMillis()-cachedFile.lastModified()<7L*24*60*60*1000){Bitmap saved=BitmapFactory.decodeFile(cachedFile.getAbsolutePath());if(saved!=null){imageCache.put(url,saved);ui.post(()->{if(url.equals(view.getTag()))deliverCachedImage(view,saved);});return;}}
                 HttpsURLConnection connection=(HttpsURLConnection)new URL(url).openConnection();
                 connection.setConnectTimeout(15000);connection.setReadTimeout(20000);
                 connection.setInstanceFollowRedirects(false);
@@ -263,6 +263,7 @@ final class NativeApi {
     private File imageFile(String url)throws Exception{byte[] digest=MessageDigest.getInstance("SHA-256").digest(url.getBytes("UTF-8"));StringBuilder name=new StringBuilder();for(byte part:digest)name.append(String.format(java.util.Locale.ROOT,"%02x",part&255));return new File(profileImageCache,name+".img");}
     private void trimImageCache(){File[] files=profileImageCache.listFiles();if(files==null)return;Arrays.sort(files,Comparator.comparingLong(File::lastModified));long size=0;int count=files.length;for(File file:files)size+=file.length();for(File file:files){if(size<=32L*1024*1024&&count<=80)break;long bytes=file.length();if(file.delete()){size-=bytes;count--;}}}
     private void deliverImage(ImageView view,Bitmap bitmap){if(view instanceof AnimatedPhotoView)((AnimatedPhotoView)view).ready(bitmap);else view.setImageBitmap(bitmap);}
+    private void deliverCachedImage(ImageView view,Bitmap bitmap){if(view instanceof AnimatedPhotoView)((AnimatedPhotoView)view).readyCached(bitmap);else view.setImageBitmap(bitmap);}
     void close() { requests.shutdownNow();images.shutdownNow(); }
     static JSONObject object(Object result) { return result instanceof JSONObject?(JSONObject)result:new JSONObject(); }
     static JSONObject json(Object... pairs) {

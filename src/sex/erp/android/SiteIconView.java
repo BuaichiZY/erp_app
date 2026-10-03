@@ -53,6 +53,7 @@ final class SiteIconView extends View {
             case "gamepad":canvas.drawRoundRect(2,6,22,19,4,4,paint);path(canvas,5,12,11,12);path(canvas,8,9,8,15);canvas.drawCircle(16,11,.7f,paint);canvas.drawCircle(19,14,.7f,paint);break;
             case "back":path(canvas,12,4,4,12,12,20);path(canvas,4,12,21,12);break;
             case "more":paint.setStyle(Paint.Style.FILL);canvas.drawCircle(12,5,1.6f,paint);canvas.drawCircle(12,12,1.6f,paint);canvas.drawCircle(12,19,1.6f,paint);break;
+            case "album":canvas.drawCircle(12,12,10,paint);canvas.drawCircle(8,8,1,paint);path(canvas,5,18,11,11,19,18);break;
             case "image_plus":canvas.drawRoundRect(3,4,21,21,2,2,paint);canvas.drawCircle(8,9,1.5f,paint);path(canvas,4,19,10,13,14,17,18,13,21,16);path(canvas,18,1,18,7);path(canvas,15,4,21,4);break;
             case "mic":canvas.drawRoundRect(9,2,15,15,3,3,paint);canvas.drawArc(6,7,18,19,0,180,false,paint);path(canvas,12,19,12,22);path(canvas,9,22,15,22);break;
             case "send":path(canvas,22,2,15,22,11,13,2,9,22,2);path(canvas,11,13,22,2);break;

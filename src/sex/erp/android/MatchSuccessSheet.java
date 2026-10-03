@@ -100,7 +100,7 @@ final class MatchSuccessSheet extends Dialog {
         String name=user.optString("displayName","");TextView fallback=copy(activity,name.isEmpty()?"?":name.substring(0,name.offsetByCodePoints(0,1)),24,palette.muted);
         inner.addView(fallback,new FrameLayout.LayoutParams(-1,-1));
         AnimatedPhotoView photo=new AnimatedPhotoView(activity);photo.palette(palette);photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        inner.addView(photo,new FrameLayout.LayoutParams(-1,-1));api.image(photo,user.optJSONObject("avatar"),true);
+        inner.addView(photo,new FrameLayout.LayoutParams(-1,-1));api.imageCached(photo,user.optJSONObject("avatar"),true);
         ring.addView(inner,new FrameLayout.LayoutParams(-1,-1));return ring;
     }
     private TextView copy(Activity activity,String text,int size,int color){TextView view=new TextView(activity);view.setText(text);view.setTextSize(size);view.setTextColor(color);view.setGravity(Gravity.CENTER);view.setIncludeFontPadding(false);return view;}

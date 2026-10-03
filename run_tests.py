@@ -15,7 +15,7 @@ if not javac or not java or not Path(javac).exists() or not Path(java).exists():
     raise SystemExit('Install JDK 17 and set JAVA_HOME.')
 output = ROOT / 'build' / 'tests'
 output.mkdir(parents=True, exist_ok=True)
-names = ('ChatPresentation', 'DiscoverFilters', 'EnergyTime', 'LikesRules',
+names = ('CameraPreviewGeometry', 'ChatPresentation', 'DiscoverFilters', 'EnergyTime', 'LikesRules',
          'PostRules', 'ProfileText', 'PullRefreshGesture', 'ReactionRules',
          'ReadRefreshBatch', 'SwipeGesturePolicy', 'ThemePalette', 'WebSocketFrames',
          'LanguageRules', 'UiStrings', 'ReleaseVersion')

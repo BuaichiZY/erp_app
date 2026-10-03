@@ -16,6 +16,7 @@ final class AnimatedPhotoView extends FocusedPhotoView {
     void palette(ThemePalette p){muted=p.muted;invalidate();}
     void loading(){stop();loading=true;failed=false;reveal=0;setImageDrawable(null);setContentDescription(UiStrings.t("图片加载中"));if(isAttachedToWindow())startPulse();invalidate();}
     void ready(Bitmap bitmap){stop();loading=false;failed=false;setImageBitmap(bitmap);setContentDescription(UiStrings.t("名片图片"));if(!isAttachedToWindow()){reveal=1;return;}reveal=0;fade=ValueAnimator.ofFloat(0,1);fade.setDuration(280);fade.setInterpolator(new DecelerateInterpolator());fade.addUpdateListener(a->{reveal=(float)a.getAnimatedValue();invalidate();});fade.start();}
+    void readyCached(Bitmap bitmap){stop();loading=false;failed=false;reveal=1;setImageBitmap(bitmap);setContentDescription(UiStrings.t("名片图片"));invalidate();}
     void failed(){stop();loading=false;failed=true;reveal=1;setContentDescription(UiStrings.t("图片加载失败"));invalidate();}
     private void startPulse(){pulse=ValueAnimator.ofFloat(0,1);pulse.setDuration(1100);pulse.setRepeatCount(ValueAnimator.INFINITE);pulse.addUpdateListener(a->{phase=(float)a.getAnimatedValue();invalidate();});pulse.start();}
     private void stop(){if(pulse!=null){pulse.cancel();pulse=null;}if(fade!=null){fade.cancel();fade=null;}}
