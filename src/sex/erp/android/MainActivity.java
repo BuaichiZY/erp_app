@@ -155,7 +155,7 @@ public final class MainActivity extends Activity {
         selectTab(0);
         updateSystemBars();root.post(this::showFirstRun);
         api.call("GET","/config",null,(data,error)->{if(error==null){config=NativeApi.object(data);applyAppearance();}});
-        api.call("GET","/me",null,(data,error)->{if(error==null){me=NativeApi.object(data);warmMyAvatar();refreshCounters();if(tab==0)selectTab(0);}});
+        api.call("GET","/me",null,(data,error)->{if(error==null){me=NativeApi.object(data);refreshCounters();if(tab==0)selectTab(0);}});
     }
     private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
     private LinearLayout column(){LinearLayout v=new LinearLayout(this);v.setOrientation(1);return v;}
@@ -871,12 +871,12 @@ public final class MainActivity extends Activity {
     }
     private void setColorScheme(String scheme){prefs.edit().putString("color_scheme",scheme).apply();applyAppearance();if(me!=null)api.call("PATCH","/me/settings",NativeApi.json("colorScheme",scheme),(data,error)->{if(isFinishing()||!scheme.equals(prefs.getString("color_scheme","dark")))return;if(error!=null)notice(UiStrings.t("主题已保存到本机，网站同步暂未成功"));else try{sub(me,"settings").put("colorScheme",scheme);}catch(Exception ignored){}});}
     private void appearanceSettings(){reset(UiStrings.t("主题与外观"));label(page,UiStrings.t("选择立即生效。"));for(int i=0;i<THEME_VALUES.length;i++){final int choice=i;Button item=button(UiStrings.t(THEME_LABELS[i]),()->setColorScheme(THEME_VALUES[choice]));item.setStateListAnimator(null);item.setElevation(0);appearanceChoices.put(THEME_VALUES[i],item);add(page,item);}updatePreferenceChoices();label(page,UiStrings.t("跟随模式：采用当前内容模式的明暗风格。跟随系统：根据手机的深色模式设置自动变化。"));}
-    @Override public void onConfigurationChanged(android.content.res.Configuration configuration){super.onConfigurationChanged(configuration);applyAppearance();String language=AppLanguage.detect(prefs.getString("language","auto"));if(!language.equals(UiStrings.language())){AppLanguage.apply(this,language);api.language=language;updateLanguageChrome();if(firstRunSheet!=null&&firstRunSheet.isShowing())firstRunSheet.language("ERP 1.1.0_beta",UiStrings.t(ABOUT_BODY));if(route!=null)route.run();}}
+    @Override public void onConfigurationChanged(android.content.res.Configuration configuration){super.onConfigurationChanged(configuration);applyAppearance();String language=AppLanguage.detect(prefs.getString("language","auto"));if(!language.equals(UiStrings.language())){AppLanguage.apply(this,language);api.language=language;updateLanguageChrome();if(firstRunSheet!=null&&firstRunSheet.isShowing())firstRunSheet.language("ERP 1.2.0_beta",UiStrings.t(ABOUT_BODY));if(route!=null)route.run();}}
     private static final String ABOUT_BODY="这是一个开源免费的 ERP.sex 独立客户端，此 APP 本身不含有任何收益，只是为了方便大家在手机上更便捷地使用网站功能。如果你是付费获得的，请退款并举报。各项服务及功能均依托于此网站。此应用仅在本机保留登录 Cookie、基本缓存与使用偏好，不会额外保存你的个人资料或聊天记录。\n\n图片通过系统选择器读取，不申请相册权限。仅在主动使用录音功能时申请麦克风权限。仅在使用二维码扫描功能时获取相机权限。";
-    private void about(){reset(UiStrings.t("关于 ERP"));heading(page,"ERP 1.1.0_beta");label(page,UiStrings.t(ABOUT_BODY));add(page,button(UiStrings.t("开源项目"),this::openSourceProject));add(page,button(UiStrings.t("检查更新"),()->{releaseUpdater.palette(palette);releaseUpdater.check();}));}
+    private void about(){reset(UiStrings.t("关于 ERP"));heading(page,"ERP 1.2.0_beta");label(page,UiStrings.t(ABOUT_BODY));add(page,button(UiStrings.t("开源项目"),this::openSourceProject));add(page,button(UiStrings.t("检查更新"),()->{releaseUpdater.palette(palette);releaseUpdater.check();}));}
     private void showFirstRun(){
         if(isFinishing()||isDestroyed()||prefs.getBoolean("intro_shown",false))return;
-        FirstRunSheet sheet=new FirstRunSheet(this,palette,"ERP 1.1.0_beta",UiStrings.t(ABOUT_BODY));firstRunSheet=sheet;
+        FirstRunSheet sheet=new FirstRunSheet(this,palette,"ERP 1.2.0_beta",UiStrings.t(ABOUT_BODY));firstRunSheet=sheet;
         sheet.setOnDismissListener(d->{if(firstRunSheet==sheet)firstRunSheet=null;});sheet.show();prefs.edit().putBoolean("intro_shown",true).apply();
     }
     private void openSourceProject(){
@@ -903,7 +903,7 @@ public final class MainActivity extends Activity {
     }
     private void changeLanguage(String preference){
         prefs.edit().putString("language",LanguageRules.preference(preference)).apply();String language=AppLanguage.detect(preference);
-        if(!language.equals(UiStrings.language())){AppLanguage.apply(this,language);api.language=language;updateLanguageChrome();if(firstRunSheet!=null&&firstRunSheet.isShowing())firstRunSheet.language("ERP 1.1.0_beta",UiStrings.t(ABOUT_BODY));}
+        if(!language.equals(UiStrings.language())){AppLanguage.apply(this,language);api.language=language;updateLanguageChrome();if(firstRunSheet!=null&&firstRunSheet.isShowing())firstRunSheet.language("ERP 1.2.0_beta",UiStrings.t(ABOUT_BODY));}
         languageSettings();
     }
     private void updateLanguageChrome(){
@@ -929,8 +929,7 @@ public final class MainActivity extends Activity {
         add(page,button(UiStrings.t("重试安全验证"),()->{if(verification!=null&&!loginBusy)verification.reset();}));
         label(page,UiStrings.t("目前使用网站已有账号。注册、邮箱验证与找回密码可在系统浏览器中完成。"));add(page,button(UiStrings.t("注册账号"),()->external(NativeApi.ORIGIN+"/register")));add(page,button(UiStrings.t("找回密码"),()->external(NativeApi.ORIGIN+"/forgot-password")));
     }
-    private void warmMyAvatar(){if(me!=null)api.imageCached(new ImageView(this),me.optJSONObject("avatar"),true);}
-    private void completeLogin(){warmMyAvatar();refreshCounters();if(afterLogin!=null){Runnable next=afterLogin;afterLogin=null;history.clear();route=next;next.run();}else selectTab(0);}
+    private void completeLogin(){refreshCounters();if(afterLogin!=null){Runnable next=afterLogin;afterLogin=null;history.clear();route=next;next.run();}else selectTab(0);}
     private void oauth(TextView status,Runnable update){
         if(loginBusy||verification==null||!verification.ready())return;final int expected=screen;String token=verification.token();loginBusy=true;update.run();status.setText(UiStrings.t("正在启动 X 授权…"));
             try {byte[] bytes=new byte[32];new java.security.SecureRandom().nextBytes(bytes);String secret=android.util.Base64.encodeToString(bytes,android.util.Base64.URL_SAFE|android.util.Base64.NO_WRAP|android.util.Base64.NO_PADDING);String hash=android.util.Base64.encodeToString(java.security.MessageDigest.getInstance("SHA-256").digest(secret.getBytes("UTF-8")),android.util.Base64.URL_SAFE|android.util.Base64.NO_WRAP|android.util.Base64.NO_PADDING);
