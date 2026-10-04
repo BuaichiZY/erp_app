@@ -14,6 +14,10 @@ targets:
   ERP:
     type: application
     platform: iOS
+    scheme:
+      testTargets:
+        - ERPTests
+        - ERPLayoutUITests
     sources:
       - path: ERP
     settings:
@@ -50,3 +54,13 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: sex.erp.ios.tests
+  ERPLayoutUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: ERPLayoutUITests
+    dependencies:
+      - target: ERP
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: sex.erp.ios.layouttests
