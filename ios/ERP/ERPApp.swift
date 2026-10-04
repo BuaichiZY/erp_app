@@ -131,7 +131,10 @@ struct ScreenView: View {
 struct LoginView: View {
     @EnvironmentObject private var app: AppState
     @Environment(\.dismiss) private var dismiss
-    @State private var email = "", password = "", totp = "", token = ""
+    @State private var email = ""
+    @State private var password = ""
+    @State private var totp = ""
+    @State private var token = ""
     @State private var busy = false
     @State private var reset = 0
     private var ready: Bool { !app.config["turnstileSiteKey"].exists || app.config["turnstileSiteKey"].string.isEmpty || !token.isEmpty }

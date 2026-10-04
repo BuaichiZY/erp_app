@@ -4,8 +4,14 @@ struct ProfileEditorView: View {
     @EnvironmentObject private var app: AppState
     @Environment(\.dismiss) private var dismiss
     @State private var profile: JSON = .null
-    @State private var name = "", tagline = "", bio = "", tonight = ""
-    @State private var platform = "pcvr", language = "zh", busy = false, picking = false
+    @State private var name = ""
+    @State private var tagline = ""
+    @State private var bio = ""
+    @State private var tonight = ""
+    @State private var platform = "pcvr"
+    @State private var language = "zh"
+    @State private var busy = false
+    @State private var picking = false
     @State private var photos: [JSON] = []
     var body: some View {
         Page(title: "编辑名片") {
@@ -38,7 +44,8 @@ struct ProfileEditorView: View {
 struct VRCView: View {
     @EnvironmentObject private var app: AppState
     @State private var data: JSON = .null
-    @State private var user = "", saving = false
+    @State private var user = ""
+    @State private var saving = false
     private let lights = [("blue", "蓝灯"), ("green", "绿灯"), ("orange", "橙灯"), ("red", "红灯")]
     @State private var lightText: [String: String] = [:]
     var body: some View {

@@ -7,7 +7,10 @@ private enum PostOptions {
 struct PostsView: View {
     @EnvironmentObject private var app: AppState
     @State private var items: [JSON] = []
-    @State private var sort = "mix", category = "", query = "", cursor = ""
+    @State private var sort = "mix"
+    @State private var category = ""
+    @State private var query = ""
+    @State private var cursor = ""
     @State private var mine = false
     @State private var composing = false
     @State private var selected: PostRoute?
@@ -69,8 +72,11 @@ struct PostDetailView: View {
     let id: String
     @State private var post: JSON = .null
     @State private var comments: [JSON] = []
-    @State private var cursor = "", draft = "", replyTo = ""
-    @State private var report = false, editing = false
+    @State private var cursor = ""
+    @State private var draft = ""
+    @State private var replyTo = ""
+    @State private var report = false
+    @State private var editing = false
     var body: some View {
         NavigationStack {
             Page(title: "") {
@@ -93,6 +99,7 @@ struct PostDetailView: View {
                     }
                     Text(L("评论")).font(.title2.bold())
                     ForEach(comments) { comment in Panel { HStack { Avatar(user: comment["author"], size: 32); Text(comment["author"]["displayName"].string).font(.headline); Spacer(); Button(L("回复")) { replyTo = comment.id }; if app.me.id == comment["author"].id { Button(L("删除")) { app.run { _ = try await app.api.request("/posts/" + APIClient.encode(id) + "/comments/" + APIClient.encode(comment.id), method: "DELETE"); try await loadComments() } } } ; Text(comment.text("body")) } }
+                    }
                     if !cursor.isEmpty { Button(L("加载更多")) { app.run { try await loadComments(more: true) } } }
                     HStack { TextField(replyTo.isEmpty ? L("写评论…") : L("回复评论…"), text: $draft, axis: .vertical).lineLimit(1...4); Button(L("发送")) { send() }.disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }.padding(12).background(Palette.surface, in: RoundedRectangle(cornerRadius: 15))
                 }
@@ -111,7 +118,16 @@ struct PostComposerView: View {
     @EnvironmentObject private var app: AppState
     @Environment(\.dismiss) private var dismiss
     var initial: JSON = .null
-    @State private var title = "", body = "", category = "daily", rating = "", r18Kind = "sexual", duration = "7", world = "", pledge = false, busy = false, photos: [JSON] = []
+    @State private var title = ""
+    @State private var body = ""
+    @State private var category = "daily"
+    @State private var rating = ""
+    @State private var r18Kind = "sexual"
+    @State private var duration = "7"
+    @State private var world = ""
+    @State private var pledge = false
+    @State private var busy = false
+    @State private var photos: [JSON] = []
     @State private var pick = false
     var bodyView: some View {
         NavigationStack {

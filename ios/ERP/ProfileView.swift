@@ -15,6 +15,7 @@ struct LikesView: View {
             else if locked { Panel { Text(L("此功能需要网站相应会员权限。")); PrimaryButton(title: "查看会员权益") { app.screen = .membership } } }
             else { LazyVGrid(columns: [GridItem(.adaptive(minimum: 155))], spacing: 16) {
                 ForEach(items) { item in VStack(spacing: 6) { ProfileTile(user: item["user"]).onTapGesture { app.profileRoute = ProfileRoute(id: item["user"].id) }; Text(item["createdAt"].string.prefix(10)).font(.caption).foregroundStyle(.secondary); if kind == "sent" && item["cancelable"].bool { Button(L("取消喜欢")) { app.run { _ = try await app.api.request("/likes/sent/" + APIClient.encode(item["user"].id), method: "DELETE"); try await load() } } } }
+                }
             }; if items.isEmpty { EmptyState() }; if !cursor.isEmpty { Button(L("加载更多")) { app.run { try await load(more: true) } } } }
         }.refreshable { do { try await load() } catch { app.message = error.localizedDescription } }.task(id: "\(kind)|\(app.mode)|\(app.authenticated)") { do { try await load() } catch { app.message = error.localizedDescription } }
     }

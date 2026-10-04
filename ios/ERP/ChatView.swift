@@ -44,9 +44,17 @@ struct ChatView: View {
     let id: String
     @State private var match: JSON = .null
     @State private var messages: [JSON] = []
-    @State private var cursor = "", text = ""
-    @State private var sending = false, imageSheet = false, voiceSheet = false, report = false, boundary = false, unmatch = false, block = false
-    @State private var pendingText = "", pendingID = ""
+    @State private var cursor = ""
+    @State private var text = ""
+    @State private var sending = false
+    @State private var imageSheet = false
+    @State private var voiceSheet = false
+    @State private var report = false
+    @State private var boundary = false
+    @State private var unmatch = false
+    @State private var block = false
+    @State private var pendingText = ""
+    @State private var pendingID = ""
     private var path: String { "/matches/" + APIClient.encode(id) }
     private var allowed: Bool { match["state"].string == "active" && match["closedReason"].string.isEmpty && (!match["boundary"]["required"].bool || match["boundary"]["myAck"].bool) && app.me["status"].string != "restricted" }
     var body: some View {
@@ -69,6 +77,7 @@ struct ChatView: View {
                         if !cursor.isEmpty { Button(L("加载更早的消息")) { app.run { try await loadMessages(earlier: true) } } }
                         ForEach(messages) { message in MessageBubble(message: message).id(message.id).contextMenu {
                             if canRecall(message) { Button(L("撤回这条消息？"), role: .destructive) { app.run { _ = try await app.api.request("/messages/\(APIClient.encode(message.id))/recall", method: "POST", body: [:]); try await reload() } } }
+                        }
                         }
                     }.padding(12).frame(maxWidth: 850).frame(maxWidth: .infinity)
                 }.background(Palette.surface, in: RoundedRectangle(cornerRadius: 20)).refreshable { do { try await reload() } catch { app.message = error.localizedDescription } }
@@ -127,9 +136,13 @@ struct ReportView: View {
     @EnvironmentObject private var app: AppState
     @Environment(\.dismiss) private var dismiss
     let target: String, id: String
-    @State private var category = "other", description = "", token = ""
-    @State private var confirmed = false, busy = false
+    @State private var category = "other"
+    @State private var description = ""
+    @State private var token = ""
+    @State private var confirmed = false
+    @State private var busy = false
     @State private var reset = 0
     let options = [("underage", "未成年用户"), ("child_avatar_nsfw", "儿童形象的成人内容"), ("unlabeled_nsfw", "未标记的成人内容"), ("real_person_nsfw", "真人成人内容"), ("non_consensual_photo", "未经同意的照片"), ("impersonation", "冒充他人"), ("harassment", "骚扰"), ("scam", "诈骗"), ("other", "其他")]
     var body: some View { NavigationStack { Form { Picker(L("举报类别"), selection: $category) { ForEach(options, id: \.0) { Text(L($0.1)).tag($0.0) } }; TextEditor(text: $description).frame(minHeight: 140); Toggle(L("我确认信息属实，举报并非恶意或报复"), isOn: $confirmed); VerificationView(action: "report", token: $token, reset: reset).frame(height: 110); PrimaryButton(title: "提交举报") { busy = true; app.run { defer { busy = false }; do { await app.api.syncWebCookies(); _ = try await app.api.request("/reports", method: "POST", body: ["targetType": target, "targetId": id, "category": category, "description": description, "lang": app.localeCode, "confirmed": true, "turnstileToken": token]); dismiss() } catch { token = ""; reset += 1; throw error } } }.disabled(busy || !confirmed || description.isEmpty || description.count > 2000 || (!app.config["turnstileSiteKey"].string.isEmpty && token.isEmpty)) }.navigationTitle(L("提交举报")).toolbar { ToolbarItem(placement: .topBarTrailing) { Button(L("关闭")) { dismiss() } } } }
+}
 }

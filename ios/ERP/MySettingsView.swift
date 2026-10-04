@@ -57,7 +57,10 @@ struct SettingsDetailView: View {
     @EnvironmentObject private var app: AppState
     let screen: Screen
     @State private var data: JSON = .null
-    @State private var password = "", newPassword = "", redeem = "", guestbookScope = "everyone"
+    @State private var password = ""
+    @State private var newPassword = ""
+    @State private var redeem = ""
+    @State private var guestbookScope = "everyone"
     private var title: String { [Screen.energy: "能量", .invite: "邀请朋友", .membership: "会员", .content: "内容与风格", .privacy: "隐私", .account: "账号与安全", .language: "语言", .appearance: "主题与外观", .blocks: "封锁名单", .sanctions: "账号状态", .sessions: "登录设备", .password: "修改密码", .notificationSettings: "通知偏好"][screen] ?? "设置" }
     var body: some View {
         Page(title: title) {
@@ -92,6 +95,7 @@ struct SettingsDetailView: View {
                 PrimaryButton(title: "修改密码") { app.run { _ = try await app.api.request("/me/password", method: "POST", body: ["currentPassword": password, "newPassword": newPassword]); password = ""; newPassword = ""; app.message = L("已保存") } }.disabled(password.isEmpty || newPassword.count < 8)
             case .sessions:
                 ForEach(data["items"].array) { session in Panel { Text(session["device"].string.isEmpty ? session["userAgent"].string : session["device"].string); Text(session["lastActiveAt"].string).font(.caption); if !session["current"].bool { Button(L("退出此设备")) { app.run { _ = try await app.api.request("/me/sessions/" + APIClient.encode(session.id), method: "DELETE"); await load() } } } }
+                }
             case .energy:
                 Panel { Label(L("补充能量") + " \(data["regen"].int)/\(data["regenMax"].int)", systemImage: "bolt.fill"); Text(L("永久能量") + " \(data["permanent"].int)"); Text(data["nextRegenAt"].string).foregroundStyle(.secondary) }
             case .membership:
@@ -124,7 +128,8 @@ struct SettingsDetailView: View {
 
 struct NotificationsView: View {
     @EnvironmentObject private var app: AppState
-    @State private var items: [JSON] = [], cursor = ""
+    @State private var items: [JSON] = []
+    @State private var cursor = ""
     var body: some View {
         Page(title: "通知") {
             Button(L("全部标为已读")) { app.run { _ = try await app.api.request("/notifications/read", method: "POST", body: ["all": true]); try await load(); await app.refreshCounters() } }.frame(maxWidth: .infinity).padding(14).background(Palette.surface, in: RoundedRectangle(cornerRadius: 16))

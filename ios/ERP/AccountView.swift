@@ -62,7 +62,9 @@ struct ShareCardView: View {
 struct QRScannerView: View {
     @EnvironmentObject private var app: AppState
     @Environment(\.dismiss) private var dismiss
-    @State private var allowed = false, denied = false, album: PhotosPickerItem?
+    @State private var allowed = false
+    @State private var denied = false
+    @State private var album: PhotosPickerItem?
     var body: some View {
         GeometryReader { geo in
             ZStack {
@@ -89,7 +91,13 @@ struct QRScannerView: View {
 }
 private struct ScanLine: View {
     @State private var offset: CGFloat = -110
-    var body: some View { GeometryReader { geometry in Rectangle().fill(LinearGradient(colors: [.clear, .cyan, .clear], startPoint: .leading, endPoint: .trailing)).frame(height: 2).offset(y: offset + geometry.size.height / 2).onAppear { withAnimation(.linear(duration: 2).repeatForever(autoreverses: true)) { offset = 110 } } } }.clipped()
+    var body: some View {
+        GeometryReader { geometry in
+            Rectangle().fill(LinearGradient(colors: [.clear, .cyan, .clear], startPoint: .leading, endPoint: .trailing))
+                .frame(height: 2).offset(y: offset + geometry.size.height / 2)
+                .onAppear { withAnimation(.linear(duration: 2).repeatForever(autoreverses: true)) { offset = 110 } }
+        }.clipped()
+    }
 }
 private struct CameraPreview: UIViewRepresentable {
     let detected: (String) -> Void

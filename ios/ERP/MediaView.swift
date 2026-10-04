@@ -11,8 +11,13 @@ struct ImageUploadView: View {
     let accepted: (JSON) -> Void
     @State private var selected: PhotosPickerItem?
     @State private var image: UIImage?
-    @State private var rating = "", kind = "sexual"
-    @State private var realPerson = false, original = false, confirmed = false, adult = false, busy = false
+    @State private var rating = ""
+    @State private var kind = "sexual"
+    @State private var realPerson = false
+    @State private var original = false
+    @State private var confirmed = false
+    @State private var adult = false
+    @State private var busy = false
     private var originalAllowed: Bool { app.me["features"]["original_upload"]["enabled"].bool }
     private var ready: Bool { image != nil && !rating.isEmpty && confirmed && (!realPerson || rating == "general") && (rating != "r18" || adult) && !busy }
     var body: some View {
