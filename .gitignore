@@ -21,3 +21,4 @@ ios/ERP.xcodeproj/
 ios/DerivedData/
 ios/*.xcarchive/
 ios/*.ipa
+ios/*-build.log
