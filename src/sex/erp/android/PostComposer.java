@@ -42,12 +42,12 @@ final class PostComposer extends LinearLayout {
     PostComposer(Activity activity,NativeApi api,ThemePalette palette,JSONObject config,JSONObject me,JSONObject initial,BooleanSupplier current,Consumer<Consumer<JSONObject>> pickImage,Consumer<JSONObject> done,Consumer<NativeApi.Failure> failure){
         super(activity);this.activity=activity;this.api=api;this.palette=palette;this.config=config;this.me=me;this.initial=initial;this.current=current;this.pickImage=pickImage;this.done=done;this.failure=failure;setOrientation(VERTICAL);
         if(initial!=null){category=initial.optString("category","daily");rating=initial.optString("rating");kind=initial.optString("r18Kind");duration="keep";eventAt=EnergyTime.timestamp(initial.optString("eventAt"));JSONObject world=initial.optJSONObject("world");if(world!=null){worldId=world.optString("id");worldName=world.optString("name");}JSONArray items=initial.optJSONArray("media");if(items!=null)for(int i=0;i<items.length();i++)if(items.optJSONObject(i)!=null)media.add(items.optJSONObject(i));JSONArray langs=initial.optJSONArray("languages");if(langs!=null)for(int i=0;i<langs.length();i++)languages.add(langs.optString(i));}
-        section(UiStrings.t("分类"));categoryButton=button(PostRules.category(category),()->{String[] labels=UiStrings.list(Arrays.copyOf(PostRules.LABELS,8));new AlertDialog.Builder(activity).setTitle(UiStrings.t("分类")).setItems(labels,(d,w)->{category=PostRules.CATEGORIES[w];categoryButton.setText(labels[w]);update();}).show();});add(categoryButton);
+        section(UiStrings.t("分类"));categoryButton=button(PostRules.category(category),()->{String[] labels=UiStrings.list(Arrays.copyOf(PostRules.LABELS,8));new SiteDialog.Builder(activity,palette).setTitle(UiStrings.t("分类")).setItems(labels,(d,w)->{category=PostRules.CATEGORIES[w];categoryButton.setText(labels[w]);update();}).show();});add(categoryButton);
         section(UiStrings.t("标题 *"));title=edit(UiStrings.t("给贴文起个标题"),initial==null?"":original(initial,"title"),false);titleCount=label("",11,palette.muted);add(titleCount);
         section(UiStrings.t("内容"));body=edit(UiStrings.t("分享日常、安排或想法…"),initial==null?"":original(initial,"body"),true);body.setMinLines(6);bodyCount=label("",11,palette.muted);add(bodyCount);
         section(UiStrings.t("内容分级 *"));ratings=row();add(ratings);kinds=row();add(kinds);
         section(UiStrings.t("活动时间（可选）"));LinearLayout dates=row();eventButton=button(UiStrings.t("选择日期和时间"),this::chooseDate);dates.addView(eventButton,new LayoutParams(0,dp(40),1));Button clear=button(UiStrings.t("清除"),()->{eventAt=-1;update();});LayoutParams clearLp=new LayoutParams(dp(60),dp(40));clearLp.leftMargin=dp(8);dates.addView(clear,clearLp);add(dates);
-        section(UiStrings.t("展示期限"));durationButton=button(UiStrings.t("7 天"),()->{String[] values={"1","3","7","14","30","long"},labels={UiStrings.t("1 天"),UiStrings.t("3 天"),UiStrings.t("7 天"),UiStrings.t("14 天"),UiStrings.t("30 天"),UiStrings.t("长期展示")};new AlertDialog.Builder(activity).setTitle(UiStrings.t("展示期限")).setItems(labels,(d,w)->{duration=values[w];update();}).show();});add(durationButton);
+        section(UiStrings.t("展示期限"));durationButton=button(UiStrings.t("7 天"),()->{String[] values={"1","3","7","14","30","long"},labels={UiStrings.t("1 天"),UiStrings.t("3 天"),UiStrings.t("7 天"),UiStrings.t("14 天"),UiStrings.t("30 天"),UiStrings.t("长期展示")};new SiteDialog.Builder(activity,palette).setTitle(UiStrings.t("展示期限")).setItems(labels,(d,w)->{duration=values[w];update();}).show();});add(durationButton);
         section(UiStrings.t("世界（可选）"));worldSelected=label("",13,palette.text);worldSelected.setPadding(dp(8),dp(6),dp(8),dp(6));worldSelected.setOnClickListener(v->{if(posting)return;worldId="";worldName="";update();});add(worldSelected);worldQuery=edit(UiStrings.t("搜索世界名称或粘贴 VRChat 世界链接"),"",false);worldQuery.setSingleLine();worldResults=column();add(worldResults);
         worldQuery.addTextChangedListener(watcher(()->{if(worldSearch!=null)ui.removeCallbacks(worldSearch);final int generation=++worldGeneration;worldSearch=()->searchWorld(generation);ui.postDelayed(worldSearch,500);}));
         languageToggle=new Switch(activity);languageToggle.setText(UiStrings.t("设置语言偏好"));languageToggle.setTextColor(palette.text);languageToggle.setChecked(!languages.isEmpty());add(languageToggle);languageChoices=new FlowLayout(activity);add(languageChoices);languageToggle.setOnCheckedChangeListener((v,on)->update());
@@ -83,12 +83,12 @@ final class PostComposer extends LinearLayout {
     private void chooseDate(){
         Calendar calendar=Calendar.getInstance();if(eventAt>=0)calendar.setTimeInMillis(eventAt);
         DatePicker date=new DatePicker(AppLanguage.context(activity));date.init(calendar.get(Calendar.YEAR),calendar.get(Calendar.MONTH),calendar.get(Calendar.DAY_OF_MONTH),null);
-        new AlertDialog.Builder(activity).setTitle(UiStrings.t("选择日期和时间")).setView(date)
+        new SiteDialog.Builder(activity,palette).setTitle(UiStrings.t("选择日期和时间")).setView(date)
             .setPositiveButton(UiStrings.t("下一步"),(dialog,which)->{
                 calendar.set(date.getYear(),date.getMonth(),date.getDayOfMonth());
                 TimePicker time=new TimePicker(AppLanguage.context(activity));time.setIs24HourView(true);
                 time.setHour(calendar.get(Calendar.HOUR_OF_DAY));time.setMinute(calendar.get(Calendar.MINUTE));
-                new AlertDialog.Builder(activity).setTitle(UiStrings.t("选择日期和时间")).setView(time)
+                new SiteDialog.Builder(activity,palette).setTitle(UiStrings.t("选择日期和时间")).setView(time)
                     .setPositiveButton(UiStrings.t("应用"),(second,selected)->{
                         calendar.set(Calendar.HOUR_OF_DAY,time.getHour());calendar.set(Calendar.MINUTE,time.getMinute());
                         calendar.set(Calendar.SECOND,0);calendar.set(Calendar.MILLISECOND,0);

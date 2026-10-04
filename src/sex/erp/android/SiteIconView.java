@@ -22,6 +22,13 @@ final class SiteIconView extends View {
         paint.setColor(color);paint.setStrokeWidth(1.8f);paint.setStrokeCap(Paint.Cap.ROUND);paint.setStrokeJoin(Paint.Join.ROUND);paint.setStyle(Paint.Style.STROKE);
         Path p=new Path();
         switch(icon){
+            case "lock":canvas.drawRoundRect(4,10,20,22,2,2,paint);p.moveTo(7,10);p.lineTo(7,6);p.cubicTo(7,0,17,0,17,6);p.lineTo(17,10);canvas.drawPath(p,paint);break;
+            case "crown":path(canvas,2,6,6,9,12,3,18,9,22,6,19,19,5,19,2,6);path(canvas,6,22,18,22);break;
+            case "gift":canvas.drawRect(3,9,21,14,paint);canvas.drawRect(5,14,19,22,paint);path(canvas,12,9,12,22);p.moveTo(12,9);p.cubicTo(0,9,4,-1,12,9);p.cubicTo(20,-1,24,9,12,9);canvas.drawPath(p,paint);break;
+            case "globe":canvas.drawCircle(12,12,10,paint);canvas.drawOval(7,2,17,22,paint);path(canvas,2,12,22,12);path(canvas,4,7,20,7);path(canvas,4,17,20,17);break;
+            case "shield_ban":path(canvas,12,2,21,6,20,14,17,20,12,23,7,20,4,14,3,6,12,2);path(canvas,6,7,18,18);break;
+            case "scale":path(canvas,12,2,12,21);path(canvas,7,22,17,22);path(canvas,3,6,21,6);path(canvas,5,6,1,15,9,15,5,6);path(canvas,19,6,15,15,23,15,19,6);break;
+            case "user_cog":canvas.drawCircle(9,6,4,paint);p.moveTo(2,22);p.lineTo(2,18);p.quadTo(2,13,10,14);canvas.drawPath(p,paint);canvas.drawCircle(18,17,3,paint);for(int i=0;i<8;i++){double angle=i*Math.PI/4;canvas.drawLine(18+(float)Math.cos(angle)*4,17+(float)Math.sin(angle)*4,18+(float)Math.cos(angle)*5,17+(float)Math.sin(angle)*5,paint);}break;
             case "logo":
                 paint.setStyle(Paint.Style.FILL);p.moveTo(4,1);p.lineTo(19,1);p.quadTo(22,1,22,4);p.lineTo(22,17);p.quadTo(22,20,19,20);p.lineTo(19,24);p.lineTo(14,20);p.lineTo(4,20);p.quadTo(1,20,1,17);p.lineTo(1,4);p.quadTo(1,1,4,1);canvas.drawPath(p,paint);
                 paint.setColor(0xff101115);canvas.drawRoundRect(3,11,20,18,1,1,paint);paint.setTypeface(Typeface.create("monospace",Typeface.BOLD));paint.setTextAlign(Paint.Align.CENTER);paint.setTextSize(7.2f);canvas.drawText("ERP",11.5f,9.2f,paint);paint.setColor(color);canvas.drawText("SEX",11.5f,16.7f,paint);break;

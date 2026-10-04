@@ -19,14 +19,16 @@ final class NativeRealtime {
     private final Listener listener;
     private final Handler ui=new Handler(Looper.getMainLooper());
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
+    private final ExecutorService closer=Executors.newSingleThreadExecutor();
     private final SecureRandom random=new SecureRandom();
     private volatile boolean wanted=false, running=false;
+    private boolean closed;
     private volatile SSLSocket socket;
     private OutputStream output;
     NativeRealtime(NativeApi api,Listener listener){this.api=api;this.listener=listener;}
-    synchronized void connect(){wanted=true;if(running)return;running=true;worker.execute(this::loop);}
-    synchronized void disconnect(){wanted=false;SSLSocket s=socket;if(s!=null)try{s.close();}catch(IOException ignored){}}
-    void close(){disconnect();worker.shutdownNow();}
+    synchronized void connect(){if(closed)return;wanted=true;if(running)return;running=true;worker.execute(this::loop);}
+    synchronized void disconnect(){wanted=false;SSLSocket s=socket;if(s!=null&&!closer.isShutdown())closer.execute(()->{try{s.close();}catch(Exception ignored){}});}
+    synchronized void close(){if(closed)return;closed=true;disconnect();worker.shutdownNow();closer.shutdown();ui.removeCallbacksAndMessages(null);}
     private void loop(){
         int retry=0;
         while(wanted&&!Thread.currentThread().isInterrupted()) {
@@ -71,7 +73,8 @@ final class NativeRealtime {
             JSONObject value=data;ui.post(()->{if(wanted)listener.event(type,value);});
         }
     }
-    private synchronized void send(int opcode,byte[] payload)throws IOException{
+    // Only the connection worker writes frames; never hold the lifecycle lock during I/O.
+    private void send(int opcode,byte[] payload)throws IOException{
         OutputStream target=output;if(target==null)throw new IOException("Disconnected");byte[] mask=new byte[4];random.nextBytes(mask);target.write(WebSocketFrames.client(opcode,payload,mask));target.flush();
     }
 }
