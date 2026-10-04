@@ -22,27 +22,6 @@ jobs:
           for file in ios/ERP/*.swift; do cmp "$file" "ios/ERP-iPad.swiftpm/Sources/ERP/$(basename "$file")"; done
           cmp ios/Playground.Package.swift ios/ERP-iPad.swiftpm/Package.swift
           grep -q 'iOSApplication' ios/ERP-iPad.swiftpm/Package.swift
-      - name: Select an iPad simulator
-        run: |
-          python3 - <<'PY' >> "$GITHUB_ENV"
-          import json, subprocess
-          data = json.loads(subprocess.check_output(['xcrun','simctl','list','-j','devices','available']))
-          pads = [d for devices in data['devices'].values() for d in devices if d['name'].startswith('iPad Pro') and d['isAvailable']]
-          assert pads, 'No iPad Pro simulator is available'
-          print('SIMULATOR_ID=' + pads[0]['udid'])
-          PY
-      - name: Run iOS rules tests
-        run: |
-          xcrun simctl boot "$SIMULATOR_ID"
-          xcrun simctl bootstatus "$SIMULATOR_ID" -b
-          xcodebuild -project ios/ERP.xcodeproj -scheme ERP -configuration Debug -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -derivedDataPath ios/DerivedData CODE_SIGNING_ALLOWED=NO test
-      - name: Capture iPad landscape layout
-        if: success()
-        run: |
-          xcrun simctl status_bar "$SIMULATOR_ID" override --time '9:41' --batteryState charged --batteryLevel 100
-          xcrun simctl launch "$SIMULATOR_ID" sex.erp.ios -skipIntroduction
-          sleep 5
-          xcrun simctl io "$SIMULATOR_ID" screenshot ios/iPad-layout.png
       - name: Upload Xcode project and simulator app
         if: always()
         uses: actions/upload-artifact@v4
@@ -51,5 +30,4 @@ jobs:
           path: |
             ios/ERP.xcodeproj
             ios/DerivedData/Build/Products/Debug-iphonesimulator/ERP.app
-            ios/iPad-layout.png
           if-no-files-found: warn

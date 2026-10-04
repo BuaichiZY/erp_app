@@ -25,7 +25,7 @@ struct MatchResult: Identifiable { let user: JSON; let matchID: String; var id: 
     @Published var appearance = UserDefaults.standard.string(forKey: "appearance") ?? "auto"
     @Published var language = UserDefaults.standard.string(forKey: "language") ?? "auto"
     @Published var update: JSON = .null
-    @Published var firstRun = !UserDefaults.standard.bool(forKey: "introduced") && !ProcessInfo.processInfo.arguments.contains("-skipIntroduction")
+    @Published var firstRun = !UserDefaults.standard.bool(forKey: "introduced")
     @Published var eventSerial = 0
     @Published var pins: [String] = []
     var socket: URLSessionWebSocketTask?
