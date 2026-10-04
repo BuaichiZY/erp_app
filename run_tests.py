@@ -18,7 +18,7 @@ output.mkdir(parents=True, exist_ok=True)
 names = ('CameraPreviewGeometry', 'ChatPresentation', 'DiscoverFilters', 'EnergyTime', 'LikesRules',
          'PostRules', 'ProfileText', 'PullRefreshGesture', 'ReactionRules',
          'MatchSwipePolicy', 'ReadResponseCache', 'ImageSizing', 'ReadRefreshBatch', 'SwipeGesturePolicy', 'ThemePalette', 'WebSocketFrames',
-         'LanguageRules', 'UiStrings', 'ReleaseVersion', 'ReleaseAssetPolicy', 'ChatImagePolicy')
+         'LanguageRules', 'UiStrings', 'ReleaseVersion', 'ReleaseAssetPolicy', 'UpdateDownloadPolicy', 'ChatImagePolicy')
 sources = [ROOT / 'src' / 'sex' / 'erp' / 'android' / (name + '.java') for name in names]
 tests = sorted(test for test in (ROOT / 'tests').glob('*Test.java') if test.stem != 'QrRoundTripTest')
 subprocess.run([javac, '-encoding', 'UTF-8', '--release', '8', '-d', str(output),
