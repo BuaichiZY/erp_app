@@ -5,6 +5,8 @@
 *.apk.idsig
 *.apk.sha256
 *.p12
+*.p8
+*.mobileprovision
 *.jks
 *.keystore
 password.txt
@@ -21,4 +23,6 @@ ios/ERP.xcodeproj/
 ios/DerivedData/
 ios/*.xcarchive/
 ios/*.ipa
+ios/ExportOptions.plist
+ios/TestFlightExport/
 ios/*-build.log

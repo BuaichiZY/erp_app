@@ -7,3 +7,5 @@ On a Mac, run `brew install xcodegen`, then `cd ios && xcodegen generate`, open 
 On Windows, run `powershell -File ios/export-playground.ps1`. Copy the resulting `ios/ERP-iPad.swiftpm` folder to Files on an iPad and open it in Swift Playgrounds. It uses the same Swift source and only asks for camera access when the QR scanner opens and microphone access when recording voice. Photo selection uses the system picker.
 
 The current iOS build checks for an iOS `.ipa` release. Android `.apk` files are not installable on iPhone or iPad. This project has not yet been tested on a physical Apple device.
+
+For signed TestFlight distribution from the Windows-hosted repository, see [TESTFLIGHT.md](TESTFLIGHT.md).

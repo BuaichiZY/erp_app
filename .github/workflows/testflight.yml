@@ -1,0 +1,104 @@
+name: TestFlight upload
+permissions:
+  contents: read
+on:
+  push:
+    tags:
+      - 'testflight/*'
+  workflow_dispatch:
+jobs:
+  upload:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          cd ios
+          xcodegen generate
+      - name: Sign, archive, and upload to TestFlight
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_DISTRIBUTION_P12_BASE64: ${{ secrets.APPLE_DISTRIBUTION_P12_BASE64 }}
+          APPLE_DISTRIBUTION_P12_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_P12_PASSWORD }}
+          APPLE_APPSTORE_PROFILE_BASE64: ${{ secrets.APPLE_APPSTORE_PROFILE_BASE64 }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_P8_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8_BASE64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in APPLE_TEAM_ID APPLE_DISTRIBUTION_P12_BASE64 APPLE_DISTRIBUTION_P12_PASSWORD APPLE_APPSTORE_PROFILE_BASE64 APP_STORE_CONNECT_API_KEY_ID APP_STORE_CONNECT_API_ISSUER_ID APP_STORE_CONNECT_API_KEY_P8_BASE64; do
+            if [[ -z "${!name:-}" ]]; then echo "Missing GitHub Actions secret: $name" >&2; exit 1; fi
+          done
+
+          signing_dir="$RUNNER_TEMP/erp-signing"
+          mkdir -p "$signing_dir" "$HOME/Library/MobileDevice/Provisioning Profiles" "$HOME/.appstoreconnect/private_keys"
+          chmod 700 "$signing_dir" "$HOME/.appstoreconnect/private_keys"
+          keychain="$signing_dir/build.keychain-db"
+          keychain_password="$(openssl rand -hex 32)"
+          trap 'security delete-keychain "$keychain" >/dev/null 2>&1 || true; rm -rf "$signing_dir"; rm -f "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"' EXIT
+          printf '%s' "$APPLE_DISTRIBUTION_P12_BASE64" | base64 -D > "$signing_dir/distribution.p12"
+          printf '%s' "$APPLE_APPSTORE_PROFILE_BASE64" | base64 -D > "$signing_dir/profile.mobileprovision"
+          printf '%s' "$APP_STORE_CONNECT_API_KEY_P8_BASE64" | base64 -D > "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
+          chmod 600 "$signing_dir/distribution.p12" "$signing_dir/profile.mobileprovision" "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
+
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security list-keychains -d user -s "$keychain"
+          security default-keychain -s "$keychain"
+          security import "$signing_dir/distribution.p12" -k "$keychain" -P "$APPLE_DISTRIBUTION_P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain" >/dev/null
+
+          security cms -D -i "$signing_dir/profile.mobileprovision" > "$signing_dir/profile.plist"
+          eval "$(python3 - "$signing_dir/profile.plist" <<'PY'
+          import os, plistlib, shlex, sys
+          with open(sys.argv[1], 'rb') as file:
+              profile = plistlib.load(file)
+          team = os.environ['APPLE_TEAM_ID']
+          identifier = profile['Entitlements']['application-identifier']
+          expected = team + '.sex.erp.ios'
+          if identifier != expected or team not in profile['TeamIdentifier']:
+              raise SystemExit('The App Store profile must match team and bundle ID sex.erp.ios')
+          for key, value in [('profile_uuid', profile['UUID']), ('profile_name', profile['Name'])]:
+              print(key + '=' + shlex.quote(value))
+          PY
+          )"
+          cp "$signing_dir/profile.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/$profile_uuid.mobileprovision"
+
+          xcodebuild -project ios/ERP.xcodeproj -scheme ERP -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath ios/ERP.xcarchive \
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY='Apple Distribution' \
+            PROVISIONING_PROFILE_SPECIFIER="$profile_name" archive
+
+          export PROFILE_UUID="$profile_uuid"
+          python3 - <<'PY'
+          import os, plistlib
+          options = {
+              'method': 'app-store-connect',
+              'destination': 'export',
+              'signingStyle': 'manual',
+              'teamID': os.environ['APPLE_TEAM_ID'],
+              'provisioningProfiles': {'sex.erp.ios': os.environ['PROFILE_UUID']},
+              'manageAppVersionAndBuildNumber': False,
+          }
+          with open('ios/ExportOptions.plist', 'wb') as file:
+              plistlib.dump(options, file)
+          PY
+          xcodebuild -exportArchive -archivePath ios/ERP.xcarchive \
+            -exportPath ios/TestFlightExport -exportOptionsPlist ios/ExportOptions.plist
+          ipa="$(find ios/TestFlightExport -maxdepth 1 -name '*.ipa' -print -quit)"
+          test -n "$ipa"
+          xcrun altool --upload-app -f "$ipa" -t ios \
+            --apiKey "$APP_STORE_CONNECT_API_KEY_ID" \
+            --apiIssuer "$APP_STORE_CONNECT_API_ISSUER_ID"
+      - name: Save signed build artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ERP-TestFlight-IPA
+          path: ios/TestFlightExport/*.ipa
+          retention-days: 14
