@@ -17,3 +17,7 @@ __pycache__/
 /*.jpg
 /*.png
 *.mp4
+ios/ERP.xcodeproj/
+ios/DerivedData/
+ios/*.xcarchive/
+ios/*.ipa

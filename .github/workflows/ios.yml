@@ -1,0 +1,28 @@
+name: iOS build
+on:
+  push:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios.yml'
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          cd ios
+          xcodegen generate
+      - name: Build iPhone and iPad simulator app
+        run: xcodebuild -project ios/ERP.xcodeproj -scheme ERP -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath ios/DerivedData CODE_SIGNING_ALLOWED=NO build
+      - name: Upload Xcode project and simulator app
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ERP-iOS-project-and-simulator
+          path: |
+            ios/ERP.xcodeproj
+            ios/DerivedData/Build/Products/Debug-iphonesimulator/ERP.app
+          if-no-files-found: warn
