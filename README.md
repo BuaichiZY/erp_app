@@ -1,3 +1,5 @@
+[🇨🇳 简体中文](README.md) | [🇺🇸 English](README_EN.md)
+
 # ERP Android
 
 ERP 1.2.0_beta，适配 [erp.sex](https://erp.sex) 的非官方 Android 原生客户端。最低支持 Android 8.0（API 26）。
