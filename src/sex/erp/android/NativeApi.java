@@ -9,14 +9,12 @@ import android.os.Looper;
 import android.webkit.CookieManager;
 import android.webkit.WebSettings;
 import android.widget.ImageView;
-import android.util.LruCache;
 import org.json.JSONObject;
 import org.json.JSONArray;
 import java.io.*;
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.*;
-import java.security.MessageDigest;
 import javax.net.ssl.HttpsURLConnection;
 
 /** Native HTTPS requests. No page scraping or WebView is used for application data. */
@@ -28,19 +26,22 @@ final class NativeApi {
         final String code;
         Failure(int status, String code, String message) { super(message); this.status=status; this.code=code; }
     }
-    private final ExecutorService requests = Executors.newFixedThreadPool(3);
+    private final ExecutorService requests = Executors.newFixedThreadPool(4);
     private final ExecutorService images = Executors.newFixedThreadPool(3);
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final CookieManager cookies = CookieManager.getInstance();
-    private final LruCache<String,Bitmap> imageCache = new LruCache<String,Bitmap>(12*1024*1024) {
-        @Override protected int sizeOf(String key,Bitmap value) { return value.getByteCount(); }
-    };
-    private final File profileImageCache;
+    private final NativeImageLoader imageLoader;
+    private final ReadResponseCache readResponses=new ReadResponseCache();
+    private final Map<String,List<Done>> readInFlight=new HashMap<>();
+    private long readEpoch;
+    private boolean closed;
     final String userAgent;
     volatile String mode = "sfw";
     volatile String language = "zh-CN";
     private ReadRefreshBatch readScope;
-    NativeApi(Context context) { userAgent=WebSettings.getDefaultUserAgent(context); cookies.setAcceptCookie(true);profileImageCache=new File(context.getCacheDir(),"profile-images");profileImageCache.mkdirs(); }
+    boolean performance;
+    private void trace(String event,long started){if(performance)android.util.Log.i("ERPPerf",event+" ms="+(android.os.SystemClock.elapsedRealtime()-started));}
+    NativeApi(Context context) { userAgent=WebSettings.getDefaultUserAgent(context); cookies.setAcceptCookie(true);imageLoader=new NativeImageLoader(new File(context.getCacheDir(),"profile-images"),userAgent,this::trace); }
 
     // Scope only reads started by this action or its callbacks, not background polling.
     void readBatch(Runnable action, Runnable complete) {
@@ -49,19 +50,38 @@ final class NativeApi {
         try { action.run(); } finally { readScope=previous;batch.release(); }
     }
 
+    void invalidateReads(String reason){readEpoch++;readResponses.invalidate(reason);}
+    private String readContext(){return mode+"|"+language;}
+    private static Object parseSnapshot(String text)throws Exception{return text.startsWith("[")?new JSONArray(text):new JSONObject(text);}
     void call(String method,String path,JSONObject body,Done callback) {
+        final long started=android.os.SystemClock.elapsedRealtime();
         final ReadRefreshBatch batch="GET".equals(method)?readScope:null;
         if(batch!=null)batch.retain();
+        final String contentMode=mode,contentLanguage=language,context=readContext();
+        final String category=method+" "+path.split("[/?]")[1];
+        Done deliver=(value,problem)->{ReadRefreshBatch previous=readScope;readScope=batch;
+            try{trace("read "+category,started);if(!closed)callback.complete(value,problem);}
+            finally{readScope=previous;if(batch!=null)batch.release();}
+        };
+        if(!"GET".equals(method))invalidateReads(path);
+        if("GET".equals(method)&&batch==null){String saved=readResponses.get(context,path,started);if(saved!=null)try{Object value=parseSnapshot(saved);ui.post(()->{trace("read memory "+category,started);deliver.complete(value,null);});return;}catch(Exception ignored){}}
+        final long epoch=readEpoch;
+        final String flight="GET".equals(method)?epoch+"|"+context+"|"+path+(batch==null?"":"|fresh"):null;
+        if(flight!=null){List<Done> waiters=readInFlight.get(flight);if(waiters!=null){waiters.add(deliver);return;}waiters=new ArrayList<>();waiters.add(deliver);readInFlight.put(flight,waiters);}
         requests.execute(() -> {
             Object result=null; Failure error=null;
-            try { result=request(method,path,body); }
+            try { result=request(method,path,body,contentMode,contentLanguage); }
             catch(Failure e) { error=e; }
             catch(Exception e) { error=new Failure(0,"NETWORK",UiStrings.t("网络连接失败，请检查网络后重试")); }
             Object value=result; Failure problem=error;
+            // The serialized copy is immutable: callbacks may edit their own JSONObject.
+            String snapshot=problem==null&&"GET".equals(method)&&ReadResponseCache.lifetime(path)>0?value.toString():null;
             ui.post(() -> {
-                ReadRefreshBatch previous=readScope;readScope=batch;
-                try { callback.complete(value,problem); }
-                finally { readScope=previous;if(batch!=null)batch.release(); }
+                if(snapshot!=null&&epoch==readEpoch&&!closed)readResponses.put(context,path,snapshot,android.os.SystemClock.elapsedRealtime());
+                if(!"GET".equals(method)&&problem==null)invalidateReads(path);
+                List<Done> waiters=flight==null?null:readInFlight.remove(flight);
+                if(waiters==null){deliver.complete(value,problem);return;}
+                for(Done waiter:waiters){Object copy=value;if(waiters.size()>1&&problem==null)try{copy=parseSnapshot(value.toString());}catch(Exception ignored){}waiter.complete(copy,problem);}
             });
         });
     }
@@ -126,13 +146,14 @@ final class NativeApi {
                     result=response;
                 }finally{connection.disconnect();}
             }catch(Failure e){error=e;}catch(OutOfMemoryError e){error=new Failure(0,"FILE_TOO_LARGE",UiStrings.t("图片过大，请选择较小的图片"));}catch(Exception e){error=new Failure(0,"NETWORK",UiStrings.t("上传失败，请检查网络或文件格式"));}
-            Object value=result;Failure problem=error;ui.post(()->callback.complete(value,problem));
+            Object value=result;Failure problem=error;ui.post(()->{if(problem==null)invalidateReads("/media");callback.complete(value,problem);});
         });
     }
     private static void multipartField(OutputStream output,String boundary,String name,String value)throws IOException {
         output.write(("--"+boundary+"\r\nContent-Disposition: form-data; name=\""+name+"\"\r\n\r\n"+value+"\r\n").getBytes("UTF-8"));
     }
-    Object request(String method,String path,JSONObject body) throws Exception {
+    Object request(String method,String path,JSONObject body) throws Exception {return request(method,path,body,mode,language);}
+    private Object request(String method,String path,JSONObject body,String contentMode,String contentLanguage) throws Exception {
         if(!method.equals("GET")&&!method.equals("HEAD"))ensureCsrf();
         HttpsURLConnection connection=(HttpsURLConnection)new URL(ORIGIN+"/api/v1"+path).openConnection();
         connection.setConnectTimeout(20000);connection.setReadTimeout(30000);
@@ -140,8 +161,8 @@ final class NativeApi {
         connection.setRequestMethod(method);
         connection.setRequestProperty("User-Agent",userAgent);
         connection.setRequestProperty("Accept","application/json");
-        connection.setRequestProperty("Accept-Language",language);
-        connection.setRequestProperty("X-Content-Mode",mode);
+        connection.setRequestProperty("Accept-Language",contentLanguage);
+        connection.setRequestProperty("X-Content-Mode",contentMode);
         connection.setRequestProperty("Origin",ORIGIN);
         connection.setRequestProperty("Referer",ORIGIN+"/");
         String cookie=cookies.getCookie(ORIGIN+"/api/v1/");
@@ -200,7 +221,8 @@ final class NativeApi {
     void image(ImageView view,JSONObject media,boolean thumbnail) {
         if(media==null || !media.optString("view","show").equals("show")) return;
         String url=thumbnail?media.optString("thumbUrl",media.optString("url")):media.optString("url",media.optString("thumbUrl"));
-        imageUrl(view,url);
+        String preview=media.optString("thumbUrl",url);
+        if(!thumbnail&&!preview.isEmpty()&&!url.isEmpty())imageLoader.loadPreview(view,preview,url);else imageUrl(view,url);
     }
     void imageCached(ImageView view,JSONObject media,boolean thumbnail){
         if(media==null||!"show".equals(media.optString("view","show")))return;
@@ -225,46 +247,9 @@ final class NativeApi {
         });
     }
     void imageUrl(ImageView view,String url) { imageUrl(view,url,false); }
-    private void imageUrl(ImageView view,String url,boolean disk) {
-        Uri uri=Uri.parse(url);
-        if(!"https".equals(uri.getScheme())) return;
-        String host=uri.getHost();
-        if(host==null || !(host.equals("erp.sex")||host.endsWith(".erp.sex"))) return;
-        view.setTag(url);
-        if(view instanceof AnimatedPhotoView)((AnimatedPhotoView)view).loading();
-        Bitmap cached=imageCache.get(url);
-        if(cached!=null) { deliverCachedImage(view,cached); return; }
-        images.execute(() -> {
-            try {
-                File cachedFile=disk?imageFile(url):null;
-                if(cachedFile!=null&&cachedFile.isFile()&&System.currentTimeMillis()-cachedFile.lastModified()<7L*24*60*60*1000){Bitmap saved=BitmapFactory.decodeFile(cachedFile.getAbsolutePath());if(saved!=null){imageCache.put(url,saved);ui.post(()->{if(url.equals(view.getTag()))deliverCachedImage(view,saved);});return;}}
-                HttpsURLConnection connection=(HttpsURLConnection)new URL(url).openConnection();
-                connection.setConnectTimeout(15000);connection.setReadTimeout(20000);
-                connection.setInstanceFollowRedirects(false);
-                connection.setRequestProperty("User-Agent",userAgent);
-                byte[] data;
-                try(InputStream input=connection.getInputStream();ByteArrayOutputStream output=new ByteArrayOutputStream()) {
-                    byte[] buffer=new byte[8192];int n;
-                    while((n=input.read(buffer))!=-1) { if(output.size()+n>12*1024*1024)throw new IOException("Image too large");output.write(buffer,0,n); }
-                    data=output.toByteArray();
-                } finally {connection.disconnect();}
-                BitmapFactory.Options options=new BitmapFactory.Options();options.inJustDecodeBounds=true;
-                BitmapFactory.decodeByteArray(data,0,data.length,options);
-                options.inSampleSize=1;
-                while(options.outWidth/options.inSampleSize>1600||options.outHeight/options.inSampleSize>1600)options.inSampleSize*=2;
-                options.inJustDecodeBounds=false;
-                Bitmap bitmap=BitmapFactory.decodeByteArray(data,0,data.length,options);
-                if(bitmap==null)throw new IOException("Invalid image");
-                if(cachedFile!=null){try{profileImageCache.mkdirs();try(FileOutputStream out=new FileOutputStream(cachedFile)){out.write(data);}trimImageCache();}catch(IOException ignored){}}
-                imageCache.put(url,bitmap);ui.post(() -> { if(url.equals(view.getTag()))deliverImage(view,bitmap); });
-            } catch(Exception ignored) {ui.post(()->{if(url.equals(view.getTag())&&view instanceof AnimatedPhotoView)((AnimatedPhotoView)view).failed();});}
-        });
-    }
-    private File imageFile(String url)throws Exception{byte[] digest=MessageDigest.getInstance("SHA-256").digest(url.getBytes("UTF-8"));StringBuilder name=new StringBuilder();for(byte part:digest)name.append(String.format(java.util.Locale.ROOT,"%02x",part&255));return new File(profileImageCache,name+".img");}
-    private void trimImageCache(){File[] files=profileImageCache.listFiles();if(files==null)return;Arrays.sort(files,Comparator.comparingLong(File::lastModified));long size=0;int count=files.length;for(File file:files)size+=file.length();for(File file:files){if(size<=32L*1024*1024&&count<=80)break;long bytes=file.length();if(file.delete()){size-=bytes;count--;}}}
-    private void deliverImage(ImageView view,Bitmap bitmap){if(view instanceof AnimatedPhotoView)((AnimatedPhotoView)view).ready(bitmap);else view.setImageBitmap(bitmap);}
-    private void deliverCachedImage(ImageView view,Bitmap bitmap){if(view instanceof AnimatedPhotoView)((AnimatedPhotoView)view).readyCached(bitmap);else view.setImageBitmap(bitmap);}
-    void close() { requests.shutdownNow();images.shutdownNow(); }
+    private void imageUrl(ImageView view,String url,boolean disk){imageLoader.load(view,url);}
+    void trimMemory(){imageLoader.trim();}
+    void close(){closed=true;readResponses.clear();requests.shutdownNow();images.shutdownNow();imageLoader.close();}
     static JSONObject object(Object result) { return result instanceof JSONObject?(JSONObject)result:new JSONObject(); }
     static JSONObject json(Object... pairs) {
         JSONObject o=new JSONObject();

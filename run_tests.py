@@ -17,7 +17,7 @@ output = ROOT / 'build' / 'tests'
 output.mkdir(parents=True, exist_ok=True)
 names = ('CameraPreviewGeometry', 'ChatPresentation', 'DiscoverFilters', 'EnergyTime', 'LikesRules',
          'PostRules', 'ProfileText', 'PullRefreshGesture', 'ReactionRules',
-         'ReadRefreshBatch', 'SwipeGesturePolicy', 'ThemePalette', 'WebSocketFrames',
+         'ReadResponseCache', 'ImageSizing', 'ReadRefreshBatch', 'SwipeGesturePolicy', 'ThemePalette', 'WebSocketFrames',
          'LanguageRules', 'UiStrings', 'ReleaseVersion', 'ReleaseAssetPolicy', 'ChatImagePolicy')
 sources = [ROOT / 'src' / 'sex' / 'erp' / 'android' / (name + '.java') for name in names]
 tests = sorted(test for test in (ROOT / 'tests').glob('*Test.java') if test.stem != 'QrRoundTripTest')
