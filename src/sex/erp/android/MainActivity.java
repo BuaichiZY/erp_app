@@ -904,13 +904,13 @@ public final class MainActivity extends Activity {
     }
     private void setColorScheme(String scheme){prefs.edit().putString("color_scheme",scheme).apply();applyAppearance();if(me!=null)api.call("PATCH","/me/settings",NativeApi.json("colorScheme",scheme),(data,error)->{if(isFinishing()||!scheme.equals(prefs.getString("color_scheme","dark")))return;if(error!=null)notice(UiStrings.t("主题已保存到本机，网站同步暂未成功"));else try{sub(me,"settings").put("colorScheme",scheme);}catch(Exception ignored){}});}
     private void appearanceSettings(){reset(UiStrings.t("主题与外观"));label(page,UiStrings.t("选择立即生效。"));for(int i=0;i<THEME_VALUES.length;i++){final int choice=i;Button item=button(UiStrings.t(THEME_LABELS[i]),()->setColorScheme(THEME_VALUES[choice]));item.setStateListAnimator(null);item.setElevation(0);appearanceChoices.put(THEME_VALUES[i],item);add(page,item);}updatePreferenceChoices();label(page,UiStrings.t("跟随模式：采用当前内容模式的明暗风格。跟随系统：根据手机的深色模式设置自动变化。"));}
-    @Override public void onConfigurationChanged(android.content.res.Configuration configuration){super.onConfigurationChanged(configuration);applyAppearance();String language=AppLanguage.detect(prefs.getString("language","auto"));if(!language.equals(UiStrings.language())){AppLanguage.apply(this,language);api.language=language;updateLanguageChrome();if(firstRunSheet!=null&&firstRunSheet.isShowing())firstRunSheet.language("ERP 1.2.0_beta",UiStrings.t(ABOUT_BODY));if(route!=null)route.run();}}
+    @Override public void onConfigurationChanged(android.content.res.Configuration configuration){super.onConfigurationChanged(configuration);applyAppearance();String language=AppLanguage.detect(prefs.getString("language","auto"));if(!language.equals(UiStrings.language())){AppLanguage.apply(this,language);api.language=language;updateLanguageChrome();if(firstRunSheet!=null&&firstRunSheet.isShowing())firstRunSheet.language("ERP 1.3.0_beta",UiStrings.t(ABOUT_BODY));if(route!=null)route.run();}}
     private static final String ABOUT_BODY="这是一个开源免费的 ERP.sex 独立客户端，此 APP 本身不含有任何收益，只是为了方便大家在手机上更便捷地使用网站功能。如果你是付费获得的，请退款并举报。各项服务及功能均依托于此网站。此应用仅在本机保留登录 Cookie、基本缓存与使用偏好，不会额外保存你的个人资料或聊天记录。\n\n图片通过系统选择器读取，不申请相册权限。仅在主动使用录音功能时申请麦克风权限。仅在使用二维码扫描功能时获取相机权限。";
     private View updateDot(){View dot=new View(this);dot.setBackground(rounded(0xffff5a4e,5));dot.setVisibility(releaseUpdater.updateAvailable()?View.VISIBLE:View.GONE);dot.setContentDescription(UiStrings.t("当前有新版本发布"));return dot;}
-    private void about(){reset(UiStrings.t("关于 ERP"));heading(page,"ERP 1.2.0_beta");label(page,UiStrings.t(ABOUT_BODY));add(page,button(UiStrings.t("开源项目"),this::openSourceProject));FrameLayout entry=new FrameLayout(this);entry.setMinimumHeight(dp(48));entry.addView(button(UiStrings.t("检查更新"),()->{releaseUpdater.palette(palette);releaseUpdater.check();}),new FrameLayout.LayoutParams(-1,-1));checkUpdateDot=updateDot();FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(dp(7),dp(7),Gravity.CENTER_VERTICAL|Gravity.RIGHT);lp.rightMargin=dp(18);entry.addView(checkUpdateDot,lp);add(page,entry);}
+    private void about(){reset(UiStrings.t("关于 ERP"));heading(page,"ERP 1.3.0_beta");label(page,UiStrings.t(ABOUT_BODY));add(page,button(UiStrings.t("开源项目"),this::openSourceProject));FrameLayout entry=new FrameLayout(this);entry.setMinimumHeight(dp(48));entry.addView(button(UiStrings.t("检查更新"),()->{releaseUpdater.palette(palette);releaseUpdater.check();}),new FrameLayout.LayoutParams(-1,-1));checkUpdateDot=updateDot();FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(dp(7),dp(7),Gravity.CENTER_VERTICAL|Gravity.RIGHT);lp.rightMargin=dp(18);entry.addView(checkUpdateDot,lp);add(page,entry);}
     private void showFirstRun(){
         if(isFinishing()||isDestroyed()||prefs.getBoolean("intro_shown",false))return;
-        FirstRunSheet sheet=new FirstRunSheet(this,palette,"ERP 1.2.0_beta",UiStrings.t(ABOUT_BODY));firstRunSheet=sheet;
+        FirstRunSheet sheet=new FirstRunSheet(this,palette,"ERP 1.3.0_beta",UiStrings.t(ABOUT_BODY));firstRunSheet=sheet;
         sheet.setOnDismissListener(d->{if(firstRunSheet==sheet)firstRunSheet=null;});sheet.show();prefs.edit().putBoolean("intro_shown",true).apply();
     }
     private void openSourceProject(){
@@ -937,7 +937,7 @@ public final class MainActivity extends Activity {
     }
     private void changeLanguage(String preference){
         prefs.edit().putString("language",LanguageRules.preference(preference)).apply();String language=AppLanguage.detect(preference);
-        if(!language.equals(UiStrings.language())){AppLanguage.apply(this,language);api.language=language;updateLanguageChrome();if(firstRunSheet!=null&&firstRunSheet.isShowing())firstRunSheet.language("ERP 1.2.0_beta",UiStrings.t(ABOUT_BODY));}
+        if(!language.equals(UiStrings.language())){AppLanguage.apply(this,language);api.language=language;updateLanguageChrome();if(firstRunSheet!=null&&firstRunSheet.isShowing())firstRunSheet.language("ERP 1.3.0_beta",UiStrings.t(ABOUT_BODY));}
         languageSettings();
     }
     private void updateLanguageChrome(){
