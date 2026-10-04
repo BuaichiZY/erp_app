@@ -2,7 +2,7 @@ import SwiftUI
 
 private enum PostOptions {
     static let categories = [("daily", "日常分享"), ("dance", "舞伴"), ("photo", "合拍"), ("event", "活动"), ("hangout", "一起玩"), ("creative", "创作合作"), ("erp", "ERP"), ("other", "其他"), ("ad", "广告"), ("club", "社团宣传")]
-    static func label(_ value: String) -> String { L(categories.first { $0.0 == value }?.1 ?? "所有分类") }
+    @MainActor static func label(_ value: String) -> String { L(categories.first { $0.0 == value }?.1 ?? "所有分类") }
 }
 struct PostsView: View {
     @EnvironmentObject private var app: AppState

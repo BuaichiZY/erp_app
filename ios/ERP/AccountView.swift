@@ -103,16 +103,16 @@ private struct CameraPreview: UIViewRepresentable {
     let detected: (String) -> Void
     func makeCoordinator() -> Coordinator { Coordinator(detected) }
     func makeUIView(context: Context) -> UIView {
-        let view = UIView(); let session = AVCaptureSession(); session.sessionPreset = .high
+        let view = PreviewCanvas(); let session = AVCaptureSession(); session.sessionPreset = .high
         guard let camera = AVCaptureDevice.default(for: .video), let input = try? AVCaptureDeviceInput(device: camera), session.canAddInput(input) else { return view }
         session.addInput(input)
         let output = AVCaptureMetadataOutput(); guard session.canAddOutput(output) else { return view }; session.addOutput(output); output.setMetadataObjectsDelegate(context.coordinator, queue: .main); output.metadataObjectTypes = [.qr]
-        let layer = AVCaptureVideoPreviewLayer(session: session); layer.videoGravity = .resizeAspectFill; view.layer.addSublayer(layer)
+        let layer = AVCaptureVideoPreviewLayer(session: session); layer.videoGravity = .resizeAspectFill; view.previewLayer = layer; view.layer.addSublayer(layer)
         context.coordinator.session = session; context.coordinator.layer = layer
         DispatchQueue.global(qos: .userInitiated).async { session.startRunning() }
         return view
     }
-    func updateUIView(_ uiView: UIView, context: Context) { context.coordinator.layer?.frame = uiView.bounds }
+    func updateUIView(_ uiView: UIView, context: Context) { uiView.setNeedsLayout() }
     static func dismantleUIView(_ uiView: UIView, coordinator: Coordinator) { let session = coordinator.session; DispatchQueue.global(qos: .userInitiated).async { session?.stopRunning() } }
     final class Coordinator: NSObject, AVCaptureMetadataOutputObjectsDelegate {
         var session: AVCaptureSession?, layer: AVCaptureVideoPreviewLayer?
@@ -120,5 +120,9 @@ private struct CameraPreview: UIViewRepresentable {
         private var fired = false
         init(_ detected: @escaping (String) -> Void) { self.detected = detected }
         func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) { guard !fired, let text = (metadataObjects.first as? AVMetadataMachineReadableCodeObject)?.stringValue else { return }; fired = true; detected(text) }
+    }
+    final class PreviewCanvas: UIView {
+        var previewLayer: AVCaptureVideoPreviewLayer?
+        override func layoutSubviews() { super.layoutSubviews(); previewLayer?.frame = bounds }
     }
 }
