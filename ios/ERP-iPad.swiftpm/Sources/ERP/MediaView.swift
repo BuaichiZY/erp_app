@@ -50,7 +50,7 @@ struct ImageUploadView: View {
             let maxEdge: CGFloat = original ? 4096 : 1600; let factor = min(1, maxEdge / max(image.size.width, image.size.height)); let size = CGSize(width: image.size.width * factor, height: image.size.height * factor)
             let format = UIGraphicsImageRendererFormat(); format.scale = 1; format.opaque = true
             let flattened = UIGraphicsImageRenderer(size: size, format: format).image { ctx in UIColor.white.setFill(); ctx.fill(CGRect(origin: .zero, size: size)); image.draw(in: CGRect(origin: .zero, size: size)) }
-            guard let data = flattened.jpegData(compressionQuality: original ? 0.92 : 0.85) else { throw URLError(.cannotEncodeContentData) }
+            guard let data = flattened.jpegData(compressionQuality: original ? 0.92 : 0.85) else { throw APIError(status: 0, message: L("图片无法读取")) }
             var options = ["rating": rating, "realPerson": String(realPerson), "original": String(original && originalAllowed)]
             if rating == "r18" { options["r18Kind"] = kind; options["adultConfirm"] = String(adult) }
             let media = try await app.api.upload(data, mime: "image/jpeg", purpose: purpose, matchID: matchID, options: options)
