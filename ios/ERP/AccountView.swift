@@ -84,7 +84,13 @@ struct QRScannerView: View {
                     }.font(.headline).foregroundStyle(.white).padding(28).background(.black.opacity(0.68))
                 }
             }
-        }.task { let state = AVCaptureDevice.authorizationStatus(for: .video); allowed = state == .authorized || (state == .notDetermined && (await AVCaptureDevice.requestAccess(for: .video))); denied = !allowed }
+        }.task {
+            let state = AVCaptureDevice.authorizationStatus(for: .video)
+            if state == .authorized { allowed = true }
+            else if state == .notDetermined { allowed = await AVCaptureDevice.requestAccess(for: .video) }
+            else { allowed = false }
+            denied = !allowed
+        }
             .onChange(of: album) { item in app.run { guard let bytes = try await item?.loadTransferable(type: Data.self), let image = UIImage(data: bytes), let cg = image.cgImage else { throw APIError(status: 0, message: L("图片无法读取")) }; let request = VNDetectBarcodesRequest(); request.symbologies = [.qr]; try VNImageRequestHandler(cgImage: cg).perform([request]); if let text = request.results?.first?.payloadStringValue { accept(text) } else { app.message = L("未找到二维码") } } }
     }
     private func accept(_ raw: String) { guard let id = ERPRules.profileID(raw) else { app.message = L("不是有效的 ERP 名片二维码"); return }; dismiss(); DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { app.profileRoute = ProfileRoute(id: id) } }
