@@ -20,7 +20,8 @@ jobs:
       - name: Validate iPad Playground package
         run: |
           for file in ios/ERP/*.swift; do cmp "$file" "ios/ERP-iPad.swiftpm/Sources/ERP/$(basename "$file")"; done
-          swift package dump-package --package-path ios/ERP-iPad.swiftpm > /dev/null
+          cmp ios/Playground.Package.swift ios/ERP-iPad.swiftpm/Package.swift
+          grep -q 'iOSApplication' ios/ERP-iPad.swiftpm/Package.swift
       - name: Select an iPad simulator
         run: |
           python3 - <<'PY' >> "$GITHUB_ENV"
