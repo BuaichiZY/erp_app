@@ -975,5 +975,7 @@
   "正在准备下载…": "Preparing download…",
   "国内下载源尚未同步此版本": "The China mirror has not synced this version yet.",
   "国内下载源需要网页验证，请在浏览器中完成下载": "The China mirror requires verification. Complete the download in your browser.",
-  "下载文件校验失败，请重新检查更新": "Downloaded file verification failed. Check for updates again."
+  "下载文件校验失败，请重新检查更新": "Downloaded file verification failed. Check for updates again.",
+  "X 授权已超时，请重新登录": "X authorization timed out. Please try signing in again.",
+  "X 授权完成后关闭浏览器，即可返回应用登录": "After authorizing with X, close the browser to return to the signed-in app."
 }

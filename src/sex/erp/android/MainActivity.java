@@ -49,6 +49,12 @@ public final class MainActivity extends Activity {
     private InlineVerification verification;
     private Runnable verificationRefresh;
     private boolean loginBusy;
+    private static final long OAUTH_CLAIM_WINDOW_MS=10*60*1000L;
+    private String oauthClaimSecret="";
+    private long oauthClaimStartedAt;
+    private boolean oauthClaimInFlight,oauthClaimDone;
+    private TextView oauthStatus;
+    private final Runnable oauthPoll=this::pollOAuth;
     private int deckUndoIndex=-1;
     private boolean loadingActive;
     private int pendingRequests;
@@ -131,6 +137,8 @@ public final class MainActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         prefs=getSharedPreferences("native_preferences",MODE_PRIVATE);
+        oauthClaimSecret=prefs.getString("oauth_claim_secret","");oauthClaimStartedAt=prefs.getLong("oauth_claim_started_at",0);oauthClaimDone=prefs.getBoolean("oauth_claim_done",false);
+        if(!oauthClaimSecret.isEmpty()&&System.currentTimeMillis()-oauthClaimStartedAt>=OAUTH_CLAIM_WINDOW_MS)clearOAuthClaim();
         AppLanguage.apply(this,AppLanguage.detect(prefs.getString("language","auto")));
         api=new NativeApi(this);api.performance=getIntent().getBooleanExtra("erp_perf",false);api.language=UiStrings.language();api.mode=prefs.getString("mode","sfw");discoverFilters=DiscoverFilters.parse(prefs.getString("discover_filters",""));postHideAds=prefs.getBoolean("post_hide_ads",false);danmakuEnabled=prefs.getBoolean("danmaku",true);grid=prefs.getBoolean("discover_grid",false);
         palette=resolvePalette();usePalette(palette);setTheme(getResources().getIdentifier(palette.dark?"AppTheme":"AppThemeLight","style",getPackageName()));releaseUpdater=new ReleaseUpdater(this,prefs,palette,this::notice);releaseUpdater.onAvailabilityChanged(this::applyCounters);
@@ -158,7 +166,7 @@ public final class MainActivity extends Activity {
         selectTab(0);
         updateSystemBars();root.post(this::showFirstRun);releaseUpdater.checkSilently();
         api.call("GET","/config",null,(data,error)->{if(error==null){config=NativeApi.object(data);applyAppearance();}});
-        api.call("GET","/me",null,(data,error)->{if(error==null){me=NativeApi.object(data);prefs.edit().putBoolean("session_known",true).apply();refreshCounters();if(tab==0)selectTab(0);}else if(error.status==401){prefs.edit().putBoolean("session_known",false).apply();api.invalidateReads("/auth/expired");}});
+        api.call("GET","/me",null,(data,error)->{if(error==null){me=NativeApi.object(data);clearOAuthClaim();prefs.edit().putBoolean("session_known",true).apply();refreshCounters();if(tab==0)selectTab(0);}else if(error.status==401){prefs.edit().putBoolean("session_known",false).apply();api.invalidateReads("/auth/expired");}});
     }
     private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
     private LinearLayout column(){LinearLayout v=new LinearLayout(this);v.setOrientation(1);return v;}
@@ -186,7 +194,7 @@ public final class MainActivity extends Activity {
         body.blankOnly(false);danmakuViews.clear();browseRows.clear();browseContent=null;browseCursor="";browseLoading=false;
         screen++;postFeedGeneration++;postRows.clear();postContent=null;postMore=null;postFeedLoading=false;postCursor="";postDetailRefresh=null;if(postSearchTask!=null)handler.removeCallbacks(postSearchTask);postSearchTask=null;postSearchInput=null;
         energyScreen=-1;energyCountdown=null;energySnapshot=null;energyDisplay=null;handler.removeCallbacks(energyTick);
-        if(verification!=null){verification.close();verification=null;}verificationRefresh=null;loginBusy=false;
+        if(verification!=null){verification.close();verification=null;}verificationRefresh=null;oauthStatus=null;loginBusy=false;
         if(voiceRecorder!=null){voiceRecorder.close();voiceRecorder=null;}for(Dialog d:new ArrayList<>(mediaDialogs))d.dismiss();mediaDialogs.clear();
         if(profileSheet!=null){profileSheet.dismiss();profileSheet=null;}
         likesRows.clear();likesRefreshPending=false;profileSheetBusy=false;profileSheetContent=null;likesMore=null;likesLoading=false;likesLocked=false;likesCursor="";likesCanceling.clear();chatId=null;currentMatch=null;chatSending=false;fetchingMessages=false;refreshingMatch=false;chatStateHint=null;chatData.clear();messagesCursor="";readMessageId="";pendingMessageKey="";pendingMessageClientId="";messageIds.clear();body.removeAllViews();pendingRequests=0;pageLoading=null;setLoading(false);
@@ -870,7 +878,7 @@ public final class MainActivity extends Activity {
         menuRow(UiStrings.t("两步验证"),this::twoFactorSettings);}
     private void emailSettings(){reset(UiStrings.t("电子邮件"));if(!authenticated())return;final int expected=screen;EditText email=input(page,UiStrings.t("电子邮件"),"",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);EditText password=me.optBoolean("hasPassword")?input(page,UiStrings.t("当前密码"),"",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD):null;TextView status=text("",12,MUTED);Button submit=primary(UiStrings.t("发送验证邮件"),()->{});submit.setEnabled(false);boolean[] busy={false};Runnable attach=()->{if(screen!=expected)return;if(verification!=null)verification.close();verification=new InlineVerification(this,value(config,"turnstileSiteKey"),api.userAgent,palette.dark,"email",(ready,message)->{status.setText(message);submit.setEnabled(ready&&!busy[0]);});add(page,verification);};if(config.has("turnstileSiteKey"))attach.run();else get("/config",r->{config=obj(r);attach.run();});add(page,status);add(page,submit);submit.setOnClickListener(v->{if(busy[0]||verification==null||!verification.ready()||!android.util.Patterns.EMAIL_ADDRESS.matcher(val(email)).matches()||(password!=null&&password.length()==0))return;busy[0]=true;submit.setEnabled(false);JSONObject payload=NativeApi.json("email",val(email),"turnstileToken",verification.token());if(password!=null)try{payload.put("password",val(password));}catch(JSONException ignored){}api.call("POST","/me/email",payload,(r,error)->{if(screen!=expected)return;busy[0]=false;verification.reset();if(error!=null)showFailure(error);else{notice(UiStrings.t("验证邮件已发送，请检查邮箱。"));back();}});});}
     private void linkMethod(String provider){final int expected=screen;try{byte[] random=new byte[32];new java.security.SecureRandom().nextBytes(random);String secret=android.util.Base64.encodeToString(random,11);String hash=android.util.Base64.encodeToString(java.security.MessageDigest.getInstance("SHA-256").digest(secret.getBytes("UTF-8")),11);api.call("POST","/auth/oauth/"+provider+"/start",NativeApi.json("intent","link","claimHash",hash),(r,error)->{if(screen!=expected)return;if(error!=null){showFailure(error);return;}String url=value(obj(r),"authorizeUrl");if(url.isEmpty()){notice(UiStrings.t("网站没有返回授权链接"));return;}external(url);pollLinkMethod(secret,0,expected);});}catch(Exception e){notice(UiStrings.t("无法启动授权"));}}
-    private void pollLinkMethod(String secret,int attempt,int expected){if(attempt>=120||screen!=expected||isFinishing())return;handler.postDelayed(()->{if(screen!=expected)return;api.call("POST","/auth/oauth/claim",NativeApi.json("secret",secret),(r,error)->{if(screen!=expected)return;if(error==null&&"done".equals(value(obj(r),"status")))get("/me",u->{me=obj(u);accountSettings();});else if(error==null||error.status==429||error.status>=500)pollLinkMethod(secret,attempt+1,expected);else showFailure(error);});},3000);}
+    private void pollLinkMethod(String secret,int attempt,int expected){if(attempt>=120||screen!=expected||isFinishing())return;handler.postDelayed(()->{if(screen!=expected)return;api.call("POST","/auth/oauth/claim",NativeApi.json("secret",secret),(r,error)->{if(screen!=expected)return;if(error==null&&"done".equals(value(obj(r),"status")))get("/me",u->{me=obj(u);accountSettings();});else if(error==null||error.status==0||error.status==429||error.status>=500)pollLinkMethod(secret,attempt+1,expected);else showFailure(error);});},3000);}
     private void twoFactorSettings(){reset(UiStrings.t("两步验证"));if(!authenticated())return;boolean enabled=me.optBoolean("twoFactorEnabled");label(page,enabled?UiStrings.t("已开启两步验证"):UiStrings.t("使用验证器保护你的账号。"));if(enabled){if(me.optBoolean("twoFactorRequired"))return;EditText code=input(page,UiStrings.t("验证码或恢复码"),"",InputType.TYPE_CLASS_TEXT);add(page,button(UiStrings.t("关闭两步验证"),()->request("POST","/me/2fa/disable",NativeApi.json("code",val(code)),r->get("/me",user->{me=obj(user);twoFactorSettings();}))));}else add(page,primary(UiStrings.t("设置两步验证"),()->request("POST","/me/2fa/setup",new JSONObject(),r->{page.removeAllViews();JSONObject result=obj(r);heading(page,UiStrings.t("两步验证"));label(page,UiStrings.t("在验证器中输入以下密钥："));String secret=value(result,"secret");TextView key=text(secret,16,TEXT);key.setTextIsSelectable(true);add(page,key);EditText code=input(page,UiStrings.t("验证码"),"",InputType.TYPE_CLASS_NUMBER);add(page,primary(UiStrings.t("启用"),()->request("POST","/me/2fa/enable",NativeApi.json("code",val(code)),response->{page.removeAllViews();heading(page,UiStrings.t("请保存恢复码"));label(page,UiStrings.t("这些恢复码仅显示一次，请妥善保管。"));JSONArray codes=array(obj(response),"recoveryCodes");for(int i=0;i<codes.length();i++){TextView line=text(codes.optString(i),16,TEXT);line.setTextIsSelectable(true);add(page,line);}add(page,button(UiStrings.t("我知道啦"),()->get("/me",user->{me=obj(user);twoFactorSettings();})));})));})));}
     private void blockedUsers(String cursor){reset(UiStrings.t("封锁名单"));if(!authenticated())return;get("/me/blocks"+(cursor.isEmpty()?"":"?cursor="+NativeApi.encode(cursor)),data->{JSONObject result=obj(data);JSONArray users=array(result,"items");if(users.length()==0)label(page,UiStrings.t("暂无封锁的用户"));for(int i=0;i<users.length();i++){JSONObject user=users.optJSONObject(i);if(user==null)continue;String id=value(user,"id");LinearLayout card=panel(page);heading(card,value(user,"displayName"));add(card,button(UiStrings.t("解除封锁"),()->request("DELETE","/users/"+NativeApi.encode(id)+"/block",null,r->blockedUsers(""))));}String next=value(result,"nextCursor");if(!next.isEmpty())add(page,button(UiStrings.t("加载更多"),()->blockedUsers(next)));});}
     private void sanctions(){reset(UiStrings.t("账号状态"));if(!authenticated())return;get("/me/sanctions",data->{JSONArray entries=data instanceof JSONArray?(JSONArray)data:array(obj(data),"items");if(entries.length()==0)label(page,UiStrings.t("暂无警告或限制"));for(int i=0;i<entries.length();i++){JSONObject sanction=entries.optJSONObject(i);if(sanction==null)continue;LinearLayout card=panel(page);heading(card,value(sanction,"kind"));label(card,value(sanction,"reason"));label(card,date(value(sanction,"startsAt"))+" → "+date(value(sanction,"endsAt")));JSONObject appeal=sanction.optJSONObject("appeal");if(appeal!=null){label(card,value(appeal,"status"));label(card,value(appeal,"note"));}else if(!"warning".equals(value(sanction,"kind"))){String id=value(sanction,"id");add(card,button(UiStrings.t("提交申诉"),()->push(()->{reset(UiStrings.t("提交申诉"));EditText reason=input(page,UiStrings.t("申诉说明"),"",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE);reason.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(3000)});add(page,primary(UiStrings.t("提交"),()->{if(val(reason).isEmpty())return;request("POST","/appeals",NativeApi.json("sanctionId",id,"text",val(reason)),r->back());}));})));}}});}
@@ -955,7 +963,7 @@ public final class MainActivity extends Activity {
 
 
     private void login(){
-        reset(UiStrings.t("登录"));final int expected=screen;label(page,UiStrings.t("使用你已有的 erp.sex 账号"));EditText email=input(page,UiStrings.t("邮箱"),"",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);EditText password=input(page,UiStrings.t("密码"),"",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);EditText totp=input(page,UiStrings.t("二步验证码（未开启可留空）"),"",InputType.TYPE_CLASS_NUMBER);TextView status=text(UiStrings.t("正在加载安全验证…"),14,MUTED);add(page,status);
+        reset(UiStrings.t("登录"));final int expected=screen;label(page,UiStrings.t("使用你已有的 erp.sex 账号"));EditText email=input(page,UiStrings.t("邮箱"),"",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);EditText password=input(page,UiStrings.t("密码"),"",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);EditText totp=input(page,UiStrings.t("二步验证码（未开启可留空）"),"",InputType.TYPE_CLASS_NUMBER);TextView status=text(UiStrings.t("正在加载安全验证…"),14,MUTED);oauthStatus=status;add(page,status);
         LinearLayout verificationHolder=column();add(page,verificationHolder);
         Button[] submit=new Button[1],oauthButton=new Button[1];
         Runnable update=()->{boolean ready=verification!=null&&verification.ready()&&!loginBusy;submit[0].setEnabled(ready);submit[0].setAlpha(ready?1:.45f);oauthButton[0].setEnabled(ready);oauthButton[0].setAlpha(ready?1:.45f);};
@@ -970,14 +978,46 @@ public final class MainActivity extends Activity {
         add(page,button(UiStrings.t("重试安全验证"),()->{if(verification!=null&&!loginBusy)verification.reset();}));
         label(page,UiStrings.t("目前使用网站已有账号。注册、邮箱验证与找回密码可在系统浏览器中完成。"));add(page,button(UiStrings.t("注册账号"),()->external(NativeApi.ORIGIN+"/register")));add(page,button(UiStrings.t("找回密码"),()->external(NativeApi.ORIGIN+"/forgot-password")));
     }
-    private void completeLogin(){prefs.edit().putBoolean("session_known",true).apply();refreshCounters();if(afterLogin!=null){Runnable next=afterLogin;afterLogin=null;history.clear();route=next;next.run();}else selectTab(0);}
+    private void completeLogin(){clearOAuthClaim();prefs.edit().putBoolean("session_known",true).apply();refreshCounters();if(afterLogin!=null){Runnable next=afterLogin;afterLogin=null;history.clear();route=next;next.run();}else selectTab(0);}
     private void oauth(TextView status,Runnable update){
         if(loginBusy||verification==null||!verification.ready())return;final int expected=screen;String token=verification.token();loginBusy=true;update.run();status.setText(UiStrings.t("正在启动 X 授权…"));
             try {byte[] bytes=new byte[32];new java.security.SecureRandom().nextBytes(bytes);String secret=android.util.Base64.encodeToString(bytes,android.util.Base64.URL_SAFE|android.util.Base64.NO_WRAP|android.util.Base64.NO_PADDING);String hash=android.util.Base64.encodeToString(java.security.MessageDigest.getInstance("SHA-256").digest(secret.getBytes("UTF-8")),android.util.Base64.URL_SAFE|android.util.Base64.NO_WRAP|android.util.Base64.NO_PADDING);
-                api.call("POST","/auth/oauth/x/start",NativeApi.json("intent","login","turnstileToken",token,"claimHash",hash),(r,error)->{if(screen!=expected)return;loginBusy=false;verification.reset();update.run();if(error!=null){showFailure(error);return;}String url=value(obj(r),"authorizeUrl");if(url.isEmpty()){notice(UiStrings.t("网站没有返回授权链接"));return;}external(url);status.setText(UiStrings.t("请在浏览器完成 X 授权后返回"));pollOAuth(secret,0,expected);});
+                api.call("POST","/auth/oauth/x/start",NativeApi.json("intent","login","turnstileToken",token,"claimHash",hash),(r,error)->{if(screen!=expected)return;loginBusy=false;verification.reset();update.run();if(error!=null){showFailure(error);return;}String url=value(obj(r),"authorizeUrl");if(url.isEmpty()){notice(UiStrings.t("网站没有返回授权链接"));return;}startOAuthClaim(secret);external(url);status.setText(UiStrings.t("X 授权完成后关闭浏览器，即可返回应用登录"));});
             }catch(Exception e){loginBusy=false;update.run();notice(UiStrings.t("无法启动授权"));}
     }
-    private void pollOAuth(String secret,int attempts,int expected){if(attempts>=120||isFinishing()||screen!=expected)return;handler.postDelayed(()->{if(screen!=expected)return;api.call("POST","/auth/oauth/claim",NativeApi.json("secret",secret),(result,error)->{if(screen!=expected)return;if(error==null&&"done".equals(value(obj(result),"status"))){get("/me",user->{me=obj(user);completeLogin();});}else if(error==null||error.status==429||error.status>=500)pollOAuth(secret,attempts+1,expected);else notice(UiStrings.t("授权未完成，请重新登录"));});},3000);}
+    private void startOAuthClaim(String secret){
+        clearOAuthClaim();oauthClaimSecret=secret;oauthClaimStartedAt=System.currentTimeMillis();
+        prefs.edit().putString("oauth_claim_secret",secret).putLong("oauth_claim_started_at",oauthClaimStartedAt).remove("oauth_claim_done").apply();
+        scheduleOAuthPoll(1500);
+    }
+    private void clearOAuthClaim(){
+        handler.removeCallbacks(oauthPoll);oauthClaimSecret="";oauthClaimStartedAt=0;oauthClaimInFlight=false;oauthClaimDone=false;
+        if(prefs!=null)prefs.edit().remove("oauth_claim_secret").remove("oauth_claim_started_at").remove("oauth_claim_done").apply();
+    }
+    private void scheduleOAuthPoll(long delay){if(oauthClaimSecret.isEmpty())return;handler.removeCallbacks(oauthPoll);handler.postDelayed(oauthPoll,delay);}
+    private void pollOAuth(){
+        if(oauthClaimSecret.isEmpty()||oauthClaimInFlight||isFinishing())return;
+        if(System.currentTimeMillis()-oauthClaimStartedAt>=OAUTH_CLAIM_WINDOW_MS){clearOAuthClaim();if(oauthStatus!=null)oauthStatus.setText(UiStrings.t("X 授权已超时，请重新登录"));return;}
+        final String secret=oauthClaimSecret;oauthClaimInFlight=true;
+        if(oauthClaimDone){
+            api.call("GET","/me",null,(user,error)->{
+                if(!secret.equals(oauthClaimSecret))return;oauthClaimInFlight=false;
+                if(error==null){boolean wasBackground=!resumed;me=obj(user);completeLogin();if(wasBackground)bringOAuthResultToFront();}
+                else if(error.status==0||error.status==429||error.status>=500)scheduleOAuthPoll(3000);
+                else{clearOAuthClaim();if(oauthStatus!=null)showFailure(error);}
+            });return;
+        }
+        api.call("POST","/auth/oauth/claim",NativeApi.json("secret",secret),(result,error)->{
+            if(!secret.equals(oauthClaimSecret))return;oauthClaimInFlight=false;
+            if(error==null&&"done".equals(value(obj(result),"status"))){oauthClaimDone=true;prefs.edit().putBoolean("oauth_claim_done",true).apply();scheduleOAuthPoll(0);}
+            else if(error==null||error.status==0||error.status==429||error.status>=500)scheduleOAuthPoll(3000);
+            else{clearOAuthClaim();if(oauthStatus!=null)showFailure(error);}
+        });
+    }
+    private void bringOAuthResultToFront(){
+        try{Intent intent=new Intent(this,MainActivity.class);intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);startActivity(intent);}
+        catch(RuntimeException ignored){} // The user can still return to the signed-in app if Android blocks a background launch.
+    }
     private void openVrcLink(String url){
         if(!ChatPresentation.vrcProfileUrl(url)){notice(UiStrings.t("链接不可用"));return;}
         Uri uri=Uri.parse(url);Intent app=new Intent(Intent.ACTION_VIEW,uri).addCategory(Intent.CATEGORY_BROWSABLE).setPackage("com.vrchat.mobile.playstore");
@@ -987,7 +1027,7 @@ public final class MainActivity extends Activity {
     }
     private void external(String url){try{Uri uri=Uri.parse(url);if(!"https".equals(uri.getScheme())){notice(UiStrings.t("链接不可用"));return;}startActivity(new Intent(Intent.ACTION_VIEW,uri).addCategory(Intent.CATEGORY_BROWSABLE));}catch(Exception e){notice(UiStrings.t("没有可用的浏览器"));}}
     private void share(String url){if(url.isEmpty())return;Intent i=new Intent(Intent.ACTION_SEND);i.setType("text/plain");i.putExtra(Intent.EXTRA_TEXT,url);startActivity(Intent.createChooser(i,UiStrings.t("分享")));}
-    @Override protected void onResume(){super.onResume();resumed=true;if(qrScanner!=null)qrScanner.onResume();applyAppearance();if(releaseUpdater!=null)releaseUpdater.resume();if(me!=null)realtime.connect();if(chatId!=null){fetchMessages(false);refreshCurrentMatch();}handler.removeCallbacks(updates);handler.postDelayed(updates,12000);handler.removeCallbacks(energyTick);if(energyScreen==screen&&energyCountdown!=null)handler.post(energyTick);}
+    @Override protected void onResume(){super.onResume();resumed=true;if(qrScanner!=null)qrScanner.onResume();applyAppearance();if(releaseUpdater!=null)releaseUpdater.resume();if(!oauthClaimSecret.isEmpty())scheduleOAuthPoll(0);if(me!=null)realtime.connect();if(chatId!=null){fetchMessages(false);refreshCurrentMatch();}handler.removeCallbacks(updates);handler.postDelayed(updates,12000);handler.removeCallbacks(energyTick);if(energyScreen==screen&&energyCountdown!=null)handler.post(energyTick);}
     @Override protected void onPause(){resumed=false;if(qrScanner!=null)qrScanner.onPause();if(releaseUpdater!=null)releaseUpdater.pause();if(voiceRecorder!=null)voiceRecorder.onPause();if(realtime!=null)realtime.disconnect();handler.removeCallbacks(updates);handler.removeCallbacks(energyTick);if(themeMenu!=null)themeMenu.dismiss();if(postCategoryMenu!=null)postCategoryMenu.dismiss();super.onPause();}
     @Override public void onTrimMemory(int level){super.onTrimMemory(level);if(api!=null&&level>=android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW)api.trimMemory();}
     @Override protected void onDestroy(){SiteDialog.closeFor(this);if(qrScanner!=null)qrScanner.dismiss();if(releaseUpdater!=null)releaseUpdater.close();if(firstRunSheet!=null)firstRunSheet.dismiss();if(matchSuccessSheet!=null)matchSuccessSheet.dismiss();if(profileSheet!=null)profileSheet.dismiss();if(voiceRecorder!=null)voiceRecorder.close();for(Dialog d:new ArrayList<>(mediaDialogs))d.dismiss();mediaDialogs.clear();if(themeMenu!=null)themeMenu.dismiss();if(postCategoryMenu!=null)postCategoryMenu.dismiss();if(verification!=null)verification.close();handler.removeCallbacksAndMessages(null);realtime.close();api.close();super.onDestroy();}
