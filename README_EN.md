@@ -2,7 +2,7 @@
 
 # ERP Android
 
-ERP 1.3.0_beta, an unofficial native Android client for [erp.sex](https://erp.sex). Supports Android 8.0 (API level 26) and higher.
+ERP 1.3.5_beta, an unofficial native Android client for [erp.sex](https://erp.sex). Supports Android 8.0 (API level 26) and higher.
 
 An app introductory guide is displayed on first launch. "Open Source Projects" under "About ERP" opens this repository in your browser. The app interface supports Simplified Chinese, Traditional Chinese, Japanese, English, and Korean; it automatically detects your system language by default, or you can manually select one in the settings.
 
@@ -33,7 +33,7 @@ $env:ANDROID_SDK_ROOT = 'C:\Users\YourUsername\AppData\Local\Android\Sdk'
 python build.py
 ```
 
-Under a standard SDK setup, the built APK is saved to `dist/ERP-Native-1.3.0_beta.apk` along with its SHA-256 checksum file.
+Under a standard SDK setup, the built APK is saved to `dist/ERP-Native-1.3.5_beta.apk` along with its SHA-256 checksum file.
 
 ### Environment Variables
 - `ERP_OUTPUT_DIR`: Customizes the output directory.
