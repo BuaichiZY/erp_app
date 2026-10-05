@@ -9,3 +9,4 @@ On Windows, run `powershell -File ios/export-playground.ps1`. Copy the resulting
 The current iOS build checks for an iOS `.ipa` release. Android `.apk` files are not installable on iPhone or iPad. This project has not yet been tested on a physical Apple device.
 
 For signed TestFlight distribution from the Windows-hosted repository, see [TESTFLIGHT.md](TESTFLIGHT.md).
+For personal installation with a free Apple Account, see [LOCAL_INSTALL.md](LOCAL_INSTALL.md). The build workflow also publishes an unsigned IPA for local signing.
