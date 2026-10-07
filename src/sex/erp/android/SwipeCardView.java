@@ -34,7 +34,14 @@ final class SwipeCardView extends FrameLayout {
     private int dp(int n){return Math.round(n*density);}
     boolean isBusy(){return busy;}
     void hold(){busy=true;}
-    private void begin(MotionEvent e){animate().cancel();setScaleX(1);setScaleY(1);pointer=e.getPointerId(0);startX=e.getRawX();startY=e.getRawY();dragging=false;recycle();velocity=VelocityTracker.obtain();velocity.addMovement(e);}
+    private void begin(MotionEvent e){animate().cancel();setScaleX(1);setScaleY(1);pointer=e.getPointerId(0);startX=e.getRawX();startY=e.getRawY();dragging=false;recycle();velocity=VelocityTracker.obtain();trackRaw(e);}
+    private void trackRaw(MotionEvent e){
+        if(velocity==null)return;
+        MotionEvent raw=MotionEvent.obtain(e);
+        raw.offsetLocation(e.getRawX()-e.getX(),e.getRawY()-e.getY());
+        velocity.addMovement(raw);
+        raw.recycle();
+    }
     @Override public boolean onInterceptTouchEvent(MotionEvent e){
         if(busy)return true;
         if(e.getActionMasked()==MotionEvent.ACTION_DOWN)begin(e);
@@ -49,7 +56,7 @@ final class SwipeCardView extends FrameLayout {
         int type=e.getActionMasked();
         if(type==MotionEvent.ACTION_DOWN){begin(e);return true;}
         if(pointer<0)return true;
-        if(velocity!=null)velocity.addMovement(e);
+        trackRaw(e);
         if(type==MotionEvent.ACTION_POINTER_DOWN||type==MotionEvent.ACTION_CANCEL){pointer=-1;restore();return true;}
         if(type==MotionEvent.ACTION_MOVE){dragging=true;pose(e.getRawX()-startX,e.getRawY()-startY);return true;}
         if(type==MotionEvent.ACTION_UP){

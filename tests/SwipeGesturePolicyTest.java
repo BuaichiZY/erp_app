@@ -9,6 +9,8 @@ public final class SwipeGesturePolicyTest {
         action(0,-121,0,"superlike");action(110,-180,800,"superlike");
         action(-121,0,0,"pass");action(121,0,0,"like");
         action(20,0,701,"like");action(-20,0,-701,"pass");
+        action(-180,10,1200,"pass");action(180,10,-1200,"like");
+        action(-20,0,1200,null);action(20,0,-1200,null);
         action(120,0,0,null);action(-120,0,0,null);action(0,-120,0,null);
         action(20,25,200,null);action(0,0,0,null);action(150,-200,0,"like");
         near(SwipeGesturePolicy.rotation(300),14);near(SwipeGesturePolicy.rotation(-300),-14);

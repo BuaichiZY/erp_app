@@ -6,8 +6,11 @@ final class SwipeGesturePolicy {
         // A downward gesture always rebounds, including a fast diagonal release.
         if(y>0&&Math.abs(y)>=Math.abs(x))return null;
         if(y<-120&&Math.abs(x)<120)return "superlike";
-        if(x>120||velocityX>700)return "like";
-        if(x<-120||velocityX<-700)return "pass";
+        // A fast release must not reverse the direction already shown by the card.
+        if(x>120)return "like";
+        if(x<-120)return "pass";
+        if(x>0&&velocityX>700)return "like";
+        if(x<0&&velocityX<-700)return "pass";
         return null;
     }
     static float rotation(float x){return Math.max(-14,Math.min(14,x*14/300));}
