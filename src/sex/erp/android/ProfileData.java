@@ -10,6 +10,8 @@ final class ProfileData {
     }
     static String text(JSONObject profile,String key){String visible=text(profile.opt(key+"I18n"));return visible.isEmpty()?text(profile.opt(key)):visible;}
     static String trust(String key){
-        switch(key){case "visitor":return UiStrings.t("访客");case "new_user":return UiStrings.t("新玩家");case "user":return UiStrings.t("玩家");case "known_user":return UiStrings.t("熟悉玩家");case "trusted_user":return UiStrings.t("资深玩家");case "nuisance":return UiStrings.t("受限玩家");default:return "";}
+        switch(key){case "visitor":return UiStrings.t("访客");case "new_user":return UiStrings.t("新玩家");case "user":return UiStrings.t("玩家");case "known_user":return UiStrings.t("长期玩家");case "trusted_user":return UiStrings.t("资深玩家");case "nuisance":return UiStrings.t("受限玩家");default:return "";}
     }
+    static int trustBackground(String key){return VrcTrustPalette.background(key);}
+    static int trustForeground(String key){return VrcTrustPalette.foreground(key);}
 }
