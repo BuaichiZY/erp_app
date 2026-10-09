@@ -1039,7 +1039,7 @@
   "分组选项": "Group options",
   "删除分组": "Delete group",
   "删除这个分组？": "Delete this group?",
-  "喜欢和超级喜欢会悄悄送出；配对后对方才会知道是谁。": "Likes and super likes are sent privately; they learn who you are after matching.",
+  "长按 ♥ 或 ★ 可以悄悄喜欢，对方要等你们配对才知道。": "Long press ♥ or ★ to send a private like. They will only know after you match.",
   "对方还看不到这些喜欢，配对后才会知道。": "They cannot see these likes yet; they will know after matching.",
   "已公开喜欢": "Like made public",
   "已移到分组": "Moved to group",

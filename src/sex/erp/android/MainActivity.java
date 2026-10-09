@@ -268,11 +268,12 @@ public final class MainActivity extends Activity {
         if(grid){page.removeAllViews();add(page,discoverControls(true));if(!authenticated())return;
             if(browseSort.equals("hot"))label(page,UiStrings.t("♨ 按收到的喜欢与超级喜欢排序，这里不能送出喜欢。"));
             browseContent=column();add(page,browseContent);loadBrowse(true);return;}
-        body.blankOnly(true);body.removeAllViews();page=column();page.setPadding(dp(20),dp(8),dp(20),0);page.setClipChildren(false);body.setClipChildren(false);body.addView(page,new FrameLayout.LayoutParams(-1,-1));
+        body.blankOnly(true);body.removeAllViews();page=column();page.setPadding(dp(20),dp(8),dp(20),dp(8));page.setClipChildren(false);body.setClipChildren(false);body.addView(page,new FrameLayout.LayoutParams(-1,-1));
         page.addView(discoverControls(false),new LinearLayout.LayoutParams(-1,dp(44)));
-        FrameLayout stage=new FrameLayout(this);stage.setClipChildren(false);stage.setClipToPadding(false);page.addView(stage,new LinearLayout.LayoutParams(-1,0,1));
-        LinearLayout actions=row();actions.setGravity(Gravity.CENTER);actions.setPadding(0,dp(12),0,dp(12));page.addView(actions,new LinearLayout.LayoutParams(-1,dp(96)));
-        TextView swipeHint=text(UiStrings.t("喜欢和超级喜欢会悄悄送出；配对后对方才会知道是谁。"),11,MUTED);swipeHint.setGravity(Gravity.CENTER);swipeHint.setMaxLines(2);page.addView(swipeHint,new LinearLayout.LayoutParams(-1,dp(30)));
+        FrameLayout stage=new FrameLayout(this);stage.setClipChildren(false);stage.setClipToPadding(false);LinearLayout.LayoutParams stageLp=new LinearLayout.LayoutParams(-1,0,1);stageLp.bottomMargin=dp(8);page.addView(stage,stageLp);
+        LinearLayout actions=row();actions.setGravity(Gravity.CENTER);actions.setPadding(0,dp(8),0,dp(8));page.addView(actions,new LinearLayout.LayoutParams(-1,dp(84)));
+        String hint=UiStrings.t("长按 ♥ 或 ★ 可以悄悄喜欢，对方要等你们配对才知道。");TextView swipeHint=text(hint,12,MUTED);swipeHint.setGravity(Gravity.CENTER);swipeHint.setIncludeFontPadding(false);swipeHint.setPadding(0,dp(6),0,dp(6));
+        android.graphics.drawable.Drawable mask=getResources().getDrawable(getResources().getIdentifier("site_venetian_mask","drawable",getPackageName()),getTheme()).mutate();mask.setTint(0xff6a5ae0);mask.setBounds(0,0,dp(14),dp(14));android.text.SpannableString hintText=new android.text.SpannableString("  "+hint);hintText.setSpan(new android.text.style.ImageSpan(mask,android.text.style.ImageSpan.ALIGN_BOTTOM),0,1,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);swipeHint.setText(hintText);swipeHint.setContentDescription(hint);page.addView(swipeHint,new LinearLayout.LayoutParams(-1,-2));
         String endpoint=me==null&&!prefs.getBoolean("session_known",false)?"/public/feed?limit=12":"/feed?limit=12"+discoverFilters.query(config.optBoolean("vrcPresenceAvailable"));
         get(endpoint,data->{JSONArray cards=array(obj(data),"items");renderDeck(stage,actions,cards,0);});
     }
@@ -315,11 +316,14 @@ public final class MainActivity extends Activity {
         JSONObject wrapper=items.optJSONObject(index);if(wrapper==null){renderDeck(stage,actions,items,index+1);return;}JSONObject p=wrapper.optJSONObject("profile");if(p==null)p=wrapper.optJSONObject("card");if(p==null)p=wrapper;final JSONObject card=p;
         final String id=value(card,"id");final int expected=screen;
         SwipeCardView[] active=new SwipeCardView[1];
+        boolean[] secret={false};
         active[0]=new SwipeCardView(this,discoverCard(card),action->{
             if(expected!=screen)return;
+            final boolean privateLike=secret[0];secret[0]=false;
             if(me==null){active[0].restore();afterLogin=route;push(this::login);return;}
             for(int i=0;i<actions.getChildCount();i++)actions.getChildAt(i).setEnabled(false);setLoading(true);
-            api.call("POST","/swipes",NativeApi.json("targetId",id,"action",action),(result,error)->{
+            JSONObject payload=privateLike?NativeApi.json("targetId",id,"action",action,"secret",true):NativeApi.json("targetId",id,"action",action);
+            api.call("POST","/swipes",payload,(result,error)->{
                 if(isFinishing()||expected!=screen)return;setLoading(false);for(int i=0;i<actions.getChildCount();i++)actions.getChildAt(i).setEnabled(i!=0||deckUndoIndex>=0);
                 if(error!=null){active[0].restore();if(error.status==401){me=null;afterLogin=route;push(this::login);}else showFailure(error);return;}
                 deckUndoIndex=index;renderDeck(stage,actions,items,index+1);refreshCounters();if(obj(result).optBoolean("matched"))showMatchSuccess(card,value(sub(obj(result),"match"),"id"),null);
@@ -330,6 +334,7 @@ public final class MainActivity extends Activity {
         addDeckButton(actions,"close",UiStrings.t("跳过"),MUTED,SURFACE,64,false,()->active[0].perform("pass"),true);
         addDeckButton(actions,"star",UiStrings.t("超级喜欢"),0xffffd447,0xff202b18,56,true,()->active[0].perform("superlike"),true);
         addDeckButton(actions,"heart",UiStrings.t("喜欢"),Color.WHITE,ACCENT,64,true,()->active[0].perform("like"),true);
+        for(int i=2;i<=3;i++){final String action=i==2?"superlike":"like";actions.getChildAt(i).setOnLongClickListener(v->{if(!active[0].isBusy()){secret[0]=true;active[0].perform(action);}return true;});}
         active[0].setScaleX(.96f);active[0].setScaleY(.96f);active[0].setAlpha(.8f);active[0].animate().scaleX(1).scaleY(1).alpha(1).setDuration(180).start();
     }
     private void addDeckButton(LinearLayout actions,String icon,String description,int tint,int background,int size,boolean filled,Runnable action,boolean enabled){FrameLayout button="star".equals(icon)?new SuperLikeButton(this,palette,action):iconButton(icon,description,tint,background,size,filled,action);button.setEnabled(enabled);button.setAlpha(enabled?1:.35f);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(size),dp(size));lp.leftMargin=lp.rightMargin=dp(4);actions.addView(button,lp);}
