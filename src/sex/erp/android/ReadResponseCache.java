@@ -17,7 +17,7 @@ final class ReadResponseCache {
         if(route.equals("/me/energy"))return 10000;
         if(route.equals("/me/passes"))return 30000;
         if(route.equals("/matches"))return 10000;
-        if(route.equals("/feed")||route.equals("/public/feed")||route.equals("/likes/received")||route.equals("/likes/sent")||route.equals("/visitors"))return 15000;
+        if(route.equals("/feed")||route.equals("/public/feed")||route.equals("/likes/received")||route.equals("/likes/sent")||route.equals("/likes/secret")||route.equals("/visitors"))return 15000;
         if(route.equals("/posts"))return 20000;
         return 0; // Security, notifications, profiles and chat always use the server.
     }

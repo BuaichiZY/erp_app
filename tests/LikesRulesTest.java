@@ -6,7 +6,7 @@ public final class LikesRulesTest {
     private static int checks;
     private static void eq(Object a,Object b){checks++;if(!a.equals(b))throw new AssertionError(a+" != "+b);}
     public static void main(String[] args){
-        eq(LikesRules.endpoint("received"),"/likes/received");eq(LikesRules.endpoint("sent"),"/likes/sent");eq(LikesRules.endpoint("visitors"),"/visitors");
+        eq(LikesRules.endpoint("received"),"/likes/received");eq(LikesRules.endpoint("sent"),"/likes/sent");eq(LikesRules.endpoint("secret"),"/likes/secret");eq(LikesRules.endpoint("visitors"),"/visitors");
         eq(LikesRules.actionState(true,"active","match","like",false),"blocked");
         eq(LikesRules.actionState(false,"active","match","superlike",true),"matched");
         eq(LikesRules.actionState(false,"unmatched","match","like",false),"like");
@@ -15,6 +15,7 @@ public final class LikesRulesTest {
         eq(LikesRules.actionState(false,"","","pass",true),"pass");
         eq(LikesRules.actionState(false,null,null,null,false),"available");
         eq(LikesRules.canCancel("sent",true,true),true);
+        eq(LikesRules.canCancel("secret",true,true),true);
         eq(LikesRules.canCancel("received",true,true),false);
         eq(LikesRules.canCancel("visitors",true,true),false);
         eq(LikesRules.canCancel("sent",false,true),false);

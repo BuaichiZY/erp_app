@@ -20,9 +20,13 @@ final class MatchSwipeMenu extends FrameLayout {
     private boolean tracking,dragging,vertical,closeOnly;
     private VelocityTracker velocity;
     MatchSwipeMenu(Context context,View content,Group group,ThemePalette palette,String pinLabel,String readLabel,Runnable pin,Runnable read){
+        this(context,content,group,palette,pinLabel,readLabel,null,pin,read,null);
+    }
+    MatchSwipeMenu(Context context,View content,Group group,ThemePalette palette,String pinLabel,String readLabel,String groupLabel,Runnable pin,Runnable read,Runnable move){
         super(context);this.content=content;this.group=group;slop=ViewConfiguration.get(context).getScaledTouchSlop();
-        int width=Math.round(104*getResources().getDisplayMetrics().density);menuWidth=width*2;
+        int width=Math.round((groupLabel==null?104:88)*getResources().getDisplayMetrics().density);menuWidth=width*(groupLabel==null?2:3);
         menu=new LinearLayout(context);menu.setOrientation(LinearLayout.HORIZONTAL);
+        if(groupLabel!=null)menu.addView(action(groupLabel,palette.surface2,palette.text,move),new LinearLayout.LayoutParams(width,-1));
         menu.addView(action(pinLabel,palette.surface2,palette.text,pin),new LinearLayout.LayoutParams(width,-1));
         menu.addView(action(readLabel,palette.accent,palette.pop?palette.text:Color.WHITE,read),new LinearLayout.LayoutParams(width,-1));
         addView(menu,new LayoutParams(menuWidth,-1,Gravity.RIGHT));menu.setVisibility(INVISIBLE);
