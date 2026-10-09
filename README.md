@@ -2,7 +2,7 @@
 
 # ERP Android
 
-ERP 1.4.0_beta，适配 [erp.sex](https://erp.sex) 的非官方 Android 原生客户端。最低支持 Android 8.0（API 26）。
+ERP 1.4.5_beta，适配 [erp.sex](https://erp.sex) 的非官方 Android 原生客户端。最低支持 Android 8.0（API 26）。
 
 首次启动会显示应用说明。“关于 ERP”的“开源项目”会在浏览器中打开本仓库。界面支持简体中文、繁体中文、日语、英语及韩语；默认自动识别手机语言，也可在设置里手动选择。
 
@@ -22,7 +22,7 @@ $env:ANDROID_SDK_ROOT = 'C:\Users\你的用户名\AppData\Local\Android\Sdk'
 python build.py
 ```
 
-标准 SDK 环境下输出为 `dist/ERP-Native-1.4.0_beta.apk`，并生成 SHA-256 文件。`ERP_OUTPUT_DIR` 可指定输出目录；`ERP_JAVA_HOME` 可覆盖 JDK 位置；`ERP_BUILD_TOOLS` 可指定 Build-Tools 版本。
+标准 SDK 环境下输出为 `dist/ERP-Native-1.4.5_beta.apk`，并生成 SHA-256 文件。`ERP_OUTPUT_DIR` 可指定输出目录；`ERP_JAVA_HOME` 可覆盖 JDK 位置；`ERP_BUILD_TOOLS` 可指定 Build-Tools 版本。
 
 首次构建会在被忽略的 `.signing/` 目录生成本机签名密钥和随机密码。`ERP_SIGNING_DIR` 可指定已有签名目录，该目录需包含 `release.p12` 和 `password.txt`，密钥别名为 `erp-release`。请保留自己的密钥；不同签名的 APK 无法直接覆盖安装。已交付 APK 使用的密钥不随源码上传。
 
