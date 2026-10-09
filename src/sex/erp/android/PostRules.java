@@ -25,4 +25,5 @@ final class PostRules {
         if(!confirmed)return UiStrings.t("请先确认遵守社区规则");return "";
     }
     static boolean canComment(String body){return body!=null&&!body.trim().isEmpty()&&body.trim().codePointCount(0,body.trim().length())<=500;}
+    static String commentCursor(Object value){return value instanceof String?(String)value:"";}
 }

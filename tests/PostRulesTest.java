@@ -29,6 +29,10 @@ public final class PostRulesTest {
         eq(valid("标题","","daily","general","",false,false),"请先确认遵守社区规则");
         eq(PostRules.canComment("\n\t "),false);eq(PostRules.canComment(null),false);
         eq(PostRules.canComment(" 你好 "),true);eq(PostRules.canComment(repeat("🌸",500)),true);eq(PostRules.canComment(repeat("🌸",501)),false);
+        eq(PostRules.commentCursor(null),"");
+        eq(PostRules.commentCursor(new Object(){public String toString(){return "null";}}),"");
+        eq(PostRules.commentCursor(""),"");
+        eq(PostRules.commentCursor("page-2"),"page-2");
         System.out.println("Post rules: "+checks+" checks passed");
     }
 }
