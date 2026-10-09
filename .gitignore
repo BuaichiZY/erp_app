@@ -5,6 +5,8 @@
 *.apk.idsig
 *.apk.sha256
 *.p12
+*.p8
+*.mobileprovision
 *.jks
 *.keystore
 password.txt
@@ -17,3 +19,13 @@ __pycache__/
 /*.jpg
 /*.png
 *.mp4
+ios/ERP.xcodeproj/
+ios/DerivedData/
+ios/*.xcarchive/
+ios/*.ipa
+ios/ExportOptions.plist
+ios/TestFlightExport/
+ios/*-build.log
+ios/ERP/Info.plist
+
+.DS_Store
