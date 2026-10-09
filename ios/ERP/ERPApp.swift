@@ -5,56 +5,53 @@ import SwiftUI
     @Environment(\.scenePhase) private var scenePhase
     var body: some Scene {
         WindowGroup {
-            RootView().environmentObject(app).tint(app.accent)
+            RootView().environmentObject(app).environmentObject(app.oauth).tint(app.accent)
                 .task { await app.prepare() }
-                .onChange(of: scenePhase) { phase in if phase == .active { app.configure(); app.connectRealtime(); app.run { await app.refreshCounters() } } else { app.disconnectRealtime() } }
+                .onChange(of: scenePhase) { phase in if phase == .active { app.configure(); app.oauth.resume(); app.connectRealtime(); app.run { await app.refreshCounters() } } else { app.oauth.pause(); app.disconnectRealtime() } }
         }
     }
 }
 struct RootView: View {
     @EnvironmentObject private var app: AppState
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     var body: some View {
         GeometryReader { geometry in
-            let desktop = UIDevice.current.userInterfaceIdiom == .pad && geometry.size.width >= 700
-            VStack(spacing: 0) {
-                HeaderView().frame(maxWidth: desktop ? 1440 : .infinity)
-                    .padding(.horizontal, desktop ? 28 : 16).padding(.vertical, desktop ? 16 : 10)
-                    .frame(maxWidth: .infinity)
-                Rectangle().fill(.secondary.opacity(0.13)).frame(height: 1)
-                if desktop {
-                    HStack(alignment: .top, spacing: 0) {
-                        DesktopSidebar().frame(width: geometry.size.width < 950 ? 188 : 230)
-                        Rectangle().fill(.secondary.opacity(0.13)).frame(width: 1)
-                        selectedTab.frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }.frame(maxWidth: 1440).frame(maxWidth: .infinity)
-                } else {
+            let sidebarWidth = LayoutMetrics(width: geometry.size.width).sidebarWidth(isPad: UIDevice.current.userInterfaceIdiom == .pad, accessibility: dynamicTypeSize.isAccessibilitySize)
+            let desktop = sidebarWidth > 0
+            // Keep one content tree while the window switches between sidebar and compact tabs.
+            HStack(spacing: 0) {
+                DesktopSidebar().frame(width: sidebarWidth).clipped()
+                    .background(app.palette.surface.ignoresSafeArea(.container, edges: .bottom))
+                    .accessibilityHidden(!desktop).allowsHitTesting(desktop)
+                Rectangle().fill(app.palette.border).frame(width: desktop ? (app.palette.pop ? 2.5 : 1) : 0).ignoresSafeArea(.container, edges: .bottom)
+                VStack(spacing: 0) {
+                    HeaderView(showAllLabels: desktop || (UIDevice.current.userInterfaceIdiom == .pad && geometry.size.width >= 700)).padding(.horizontal, desktop ? 24 : 16)
+                        .padding(.vertical, desktop ? 12 : 8)
+                        .frame(height: !desktop && ((app.tab == 2 && app.chatRoute != nil) || (app.tab == 3 && app.postRoute != nil)) ? 0 : nil).clipped()
+                    Rectangle().fill(app.palette.border).frame(height: !desktop && ((app.tab == 2 && app.chatRoute != nil) || (app.tab == 3 && app.postRoute != nil)) ? 0 : (app.palette.pop ? 2.5 : 1))
                     TabView(selection: $app.tab) {
-                        DiscoverView().tabItem { Label(L("探索"), systemImage: "safari") }.tag(0)
-                        LikesView().tabItem { Label(L("喜欢我"), systemImage: "heart") }.badge(app.counters["newLikes"].int).tag(1)
-                        MatchesView().tabItem { Label(L("配对"), systemImage: "bubble.left") }.badge(app.counters["unreadMessages"].int).tag(2)
-                        PostsView().tabItem { Label(L("广场"), systemImage: "megaphone") }.tag(3)
-                        MyView().tabItem { Label(L("我"), systemImage: "person") }.badge(app.counters["newVisitors"].int > 0 ? String(app.counters["newVisitors"].int) : app.updateAvailable ? "•" : nil).tag(4)
+                        DiscoverView().toolbar(desktop ? .hidden : .visible, for: .tabBar).tabItem { Label(L("探索"), systemImage: "safari") }.tag(0)
+                        LikesView().toolbar(desktop ? .hidden : .visible, for: .tabBar).tabItem { Label(L("喜欢我"), systemImage: "heart") }.badge(app.counters["newLikes"].int).tag(1)
+                        MatchesView().toolbar(desktop || app.chatRoute != nil ? .hidden : .visible, for: .tabBar).tabItem { Label(L("配对"), systemImage: "bubble.left") }.badge(app.counters["unreadMessages"].int).tag(2)
+                        PostsView().toolbar(desktop || app.postRoute != nil ? .hidden : .visible, for: .tabBar).tabItem { Label(L("广场"), systemImage: "megaphone") }.tag(3)
+                        MyView().toolbar(desktop ? .hidden : .visible, for: .tabBar).tabItem { Label(L("我"), systemImage: "person") }.badge(app.counters["newVisitors"].int > 0 ? String(app.counters["newVisitors"].int) : app.updateAvailable ? "•" : nil).tag(4)
                     }
-                }
+                    .environment(\.horizontalSizeClass, desktop ? .regular : .compact)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }.frame(maxWidth: .infinity)
             }
-        }.background(Palette.background)
-            .preferredColorScheme(app.appearance == "dark" ? .dark : app.appearance == "light" ? .light : app.appearance == "system" ? nil : app.mode == "nsfw" ? .dark : .light)
+        }.background {
+            PhonePortraitRequirement(background: UIColor(app.palette.background), foreground: UIColor(app.palette.text), title: L("请竖屏使用此应用"))
+                .allowsHitTesting(false).accessibilityHidden(true)
+        }.foregroundStyle(app.palette.text).background(app.palette.background)
+            .preferredColorScheme(app.preferredScheme)
             .environment(\.locale, Locale(identifier: app.localeCode))
-            .sheet(item: $app.screen) { screen in ScreenView(screen: screen).environmentObject(app) }
-            .sheet(item: $app.profileRoute) { route in ProfileDetailView(id: route.id).environmentObject(app) }
-            .fullScreenCover(item: $app.chatRoute) { route in ChatView(id: route.id).environmentObject(app) }
+            .sheet(item: Binding(get: { app.screen == .login ? nil : app.screen }, set: { if app.screen != .login { app.screen = $0 } }), onDismiss: app.finishNotificationNavigation) { screen in ScreenView(screen: screen).environmentObject(app).sitePresentation() }
+            .fullScreenCover(isPresented: Binding(get: { app.screen == .login }, set: { if !$0 && app.screen == .login { app.screen = nil } })) { LoginView().environmentObject(app).environmentObject(app.oauth) }
+            .sheet(item: $app.profileRoute) { route in ProfileDetailView(id: route.id, readOnly: route.readOnly).environmentObject(app).sitePresentation() }
             .sheet(item: $app.matched) { result in MatchSuccessView(result: result).environmentObject(app).presentationDetents([.medium, .large]) }
             .sheet(isPresented: $app.firstRun) { IntroductionView().environmentObject(app).interactiveDismissDisabled() }
             .alert(L("提示"), isPresented: Binding(get: { app.message != nil }, set: { if !$0 { app.message = nil } })) { Button(L("我知道啦")) { app.message = nil } } message: { Text(app.message ?? "") }
-    }
-    @ViewBuilder private var selectedTab: some View {
-        switch app.tab {
-        case 1: LikesView()
-        case 2: MatchesView()
-        case 3: PostsView()
-        case 4: MyView()
-        default: DiscoverView()
-        }
     }
 }
 struct DesktopSidebar: View {
@@ -62,8 +59,9 @@ struct DesktopSidebar: View {
     private let tabs: [(String, String)] = [("探索", "safari"), ("喜欢我", "heart"), ("配对", "bubble.left"), ("广场", "megaphone"), ("我", "person")]
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
+            Text("erp.sex").font(.title2.bold()).padding(.horizontal, 13).padding(.vertical, 12)
             ForEach(tabs.indices, id: \.self) { index in
-                Button { app.tab = index } label: {
+                Button { app.tab = index; if index == 0 { app.discoveryGrid = false } } label: {
                     HStack(spacing: 13) {
                         Image(systemName: tabs[index].1).frame(width: 24)
                         Text(L(tabs[index].0)).font(.headline)
@@ -72,39 +70,81 @@ struct DesktopSidebar: View {
                         if index == 2 && app.counters["unreadMessages"].int > 0 { Dot(count: app.counters["unreadMessages"].int) }
                         if index == 4 && (app.counters["newVisitors"].int > 0 || app.updateAvailable) { Dot(count: app.counters["newVisitors"].int) }
                     }.padding(.horizontal, 13).frame(height: 48)
-                        .foregroundStyle(app.tab == index ? app.accent : .primary)
-                        .background(app.tab == index ? app.accent.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 14))
+                        .foregroundStyle((app.tab == index && (index != 0 || !app.discoveryGrid)) ? (app.palette.pop ? .white : app.accent) : app.palette.muted)
+                        .background((app.tab == index && (index != 0 || !app.discoveryGrid)) ? app.accent.opacity(app.palette.pop ? 1 : 0.12) : .clear, in: RoundedRectangle(cornerRadius: 14))
                 }.buttonStyle(.plain)
+                    .accessibilityAddTraits((app.tab == index && (index != 0 || !app.discoveryGrid)) ? .isSelected : [])
             }
-            Spacer(minLength: 0)
+            SiteDivider().padding(.vertical, 14)
+            Button { app.tab = 0; app.discoveryGrid = true } label: {
+                Label(L("浏览"), systemImage: "square.grid.2x2").font(.headline).frame(maxWidth: .infinity, alignment: .leading).padding(14)
+                    .foregroundStyle(app.tab == 0 && app.discoveryGrid ? (app.palette.pop ? .white : app.accent) : app.palette.muted)
+                    .background(app.tab == 0 && app.discoveryGrid ? app.accent.opacity(app.palette.pop ? 1 : 0.12) : .clear, in: RoundedRectangle(cornerRadius: 14))
+            }.buttonStyle(.plain)
             if app.authenticated {
                 Button { app.screen = .settings } label: { Label(L("设置"), systemImage: "gearshape").frame(maxWidth: .infinity, alignment: .leading).padding(14) }
-                    .buttonStyle(.plain).foregroundStyle(.secondary)
+                    .buttonStyle(.plain).foregroundStyle(app.palette.muted)
             }
-        }.padding(14).frame(maxHeight: .infinity).background(Palette.background)
+            Spacer(minLength: 0)
+        }.padding(14).frame(maxHeight: .infinity).background(app.palette.surface)
     }
 }
 struct HeaderView: View {
     @EnvironmentObject private var app: AppState
     @Namespace private var modeAnimation
-    let modes = [("sfw", "SFW", "heart"), ("mixed", "", "square.3.layers"), ("nsfw", "NSFW", "flame")]
+    var showAllLabels = false
+    let modes = [("sfw", "SFW", "heart"), ("mixed", "混合", "square.stack.3d.up"), ("nsfw", "NSFW", "flame")]
     var body: some View {
-        HStack(spacing: 9) {
-            HStack(spacing: 3) {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                modePicker
+                Spacer(minLength: 12)
+                HStack(spacing: showAllLabels ? 9 : 3) {
+                    energyButton
+                    scanButton
+                    notificationButton
+                    appearanceMenu
+                }.fixedSize()
+            }
+            VStack(spacing: 6) {
+                HStack { modePicker; Spacer(minLength: 4); energyButton }
+                HStack { Spacer(); scanButton; notificationButton; appearanceMenu }
+            }
+        }.font(showAllLabels ? .title3 : .body).buttonStyle(.plain)
+    }
+    private var energyCount: Int { app.energy["regen"].int + app.energy["permanent"].int }
+    private var modePicker: some View {
+        HStack(spacing: 3) {
                 ForEach(modes, id: \.0) { value in
                     Button { withAnimation(.spring(response: 0.3)) { app.setMode(value.0) } } label: {
-                        HStack(spacing: 4) { Image(systemName: value.2); if app.mode == value.0 { Text(value.1).font(.subheadline) } }.padding(.horizontal, 9).frame(height: 36).background { if app.mode == value.0 { Capsule().fill(Palette.surface).matchedGeometryEffect(id: "mode", in: modeAnimation) } }
-                    }.foregroundStyle(app.mode == value.0 ? .primary : .secondary)
+                        HStack(spacing: showAllLabels ? 4 : 3) { Image(systemName: value.2); if showAllLabels || app.mode == value.0 { Text(L(value.0 == "nsfw" && showAllLabels ? "仅 NSFW" : value.1)).font(showAllLabels ? .subheadline : .caption) } }.padding(.horizontal, showAllLabels ? 9 : 6).frame(height: 36).background { if app.mode == value.0 { Capsule().fill(app.palette.selection).matchedGeometryEffect(id: "mode", in: modeAnimation) } }
+                    }.foregroundStyle(app.mode == value.0 ? app.palette.selectionText : app.palette.muted)
+                        .accessibilityLabel(value.1.isEmpty ? L("混合") : value.1)
+                        .accessibilityAddTraits(app.mode == value.0 ? .isSelected : [])
                 }
-            }.padding(4).background(Palette.secondary, in: Capsule())
-            Spacer(minLength: 0)
-            Button { if app.requireLogin() { app.screen = .energy } } label: { HStack(spacing: 3) { Image(systemName: "bolt.fill").foregroundStyle(.yellow); Text(String(app.energy["regen"].int + app.energy["permanent"].int)) }.font(.subheadline).padding(9).background(Palette.secondary, in: Capsule()) }.foregroundStyle(.primary)
-            Button { app.screen = .scan } label: { Image(systemName: "qrcode.viewfinder") }.accessibilityLabel(L("扫描二维码"))
-            Button { if app.requireLogin() { app.screen = .notifications } } label: { Image(systemName: "bell").overlay(alignment: .topTrailing) { if app.counters["unreadNotifications"].int > 0 { Dot().offset(x: 3, y: -3) } } }.accessibilityLabel(L("通知"))
-            Menu {
-                ForEach([("auto", "跟随模式风格", "square.3.layers"), ("light", "浅色", "sun.max"), ("dark", "深色", "moon"), ("system", "跟随系统设置", "desktopcomputer")], id: \.0) { choice in Button { app.setAppearance(choice.0) } label: { Label(L(choice.1), systemImage: choice.2) } }
-            } label: { Image(systemName: app.appearance == "light" ? "sun.max" : "moon") }.accessibilityLabel(L("主题与外观"))
-        }.font(.title3).buttonStyle(.plain)
+        }.padding(4).background(app.palette.secondary, in: Capsule()).siteOutline(Capsule(), shadow: false, normalBorder: false).fixedSize()
+    }
+    private var energyButton: some View {
+        Button { if app.requireLogin() { app.screen = .energy } } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "bolt.fill").foregroundStyle(app.palette.energy)
+                Text(showAllLabels && app.energy["regenMax"].exists ? "\(app.energy["regen"].int)/\(app.energy["regenMax"].int)" : String(energyCount))
+                if showAllLabels && app.energy["permanent"].exists { EnergyGem(); Text(String(app.energy["permanent"].int)) }
+            }
+                .font(showAllLabels ? .subheadline : .caption).padding(showAllLabels ? 9 : 7).background(app.palette.secondary, in: Capsule())
+        }.foregroundStyle(app.palette.text).accessibilityLabel(L("能量") + " \(energyCount)")
+    }
+    private var scanButton: some View {
+        Button { app.screen = .scan } label: { Image(systemName: "qrcode.viewfinder").frame(width: showAllLabels ? 44 : 32, height: 44) }.accessibilityLabel(L("扫描二维码"))
+    }
+    private var notificationButton: some View {
+        Button { if app.requireLogin() { app.screen = .notifications } } label: { Image(systemName: "bell").frame(width: showAllLabels ? 44 : 32, height: 44).overlay(alignment: .topTrailing) { if app.counters["unreadNotifications"].int > 0 { Dot() } } }.accessibilityLabel(L("通知"))
+    }
+    private var appearanceMenu: some View {
+        Menu { appearanceChoices } label: { Image(systemName: app.appearance == "light" ? "sun.max" : "moon").frame(width: showAllLabels ? 44 : 32, height: 44) }.accessibilityLabel(L("主题与外观"))
+    }
+    private var appearanceChoices: some View {
+        ForEach([("auto", "跟随模式风格", "square.stack.3d.up"), ("light", "浅色", "sun.max"), ("dark", "深色", "moon"), ("system", "跟随系统设置", "desktopcomputer")], id: \.0) { choice in Button { app.setAppearance(choice.0) } label: { Label(L(choice.1), systemImage: choice.2) } }
     }
 }
 struct ScreenView: View {
@@ -124,41 +164,68 @@ struct ScreenView: View {
                 case .vrc: VRCView()
                 default: SettingsDetailView(screen: screen)
                 }
-            }.toolbar { ToolbarItem(placement: .topBarTrailing) { Button { app.screen = nil } label: { Image(systemName: "xmark") }.accessibilityLabel(L("关闭")) } }.toolbarBackground(Palette.background, for: .navigationBar)
-        }
+            }.toolbar { ToolbarItem(placement: .topBarTrailing) { Button { app.screen = nil } label: { Image(systemName: "xmark") }.accessibilityLabel(L("关闭")) } }.toolbarBackground(app.palette.background, for: .navigationBar).toolbarBackground(.visible, for: .navigationBar)
+        }.foregroundStyle(app.palette.text).presentationBackground(app.palette.background).preferredColorScheme(app.preferredScheme)
     }
 }
-struct LoginView: View {
-    @EnvironmentObject private var app: AppState
-    @Environment(\.dismiss) private var dismiss
-    @State private var email = ""
-    @State private var password = ""
-    @State private var totp = ""
-    @State private var token = ""
-    @State private var busy = false
-    @State private var reset = 0
-    private var ready: Bool { !app.config["turnstileSiteKey"].exists || app.config["turnstileSiteKey"].string.isEmpty || !token.isEmpty }
-    var body: some View {
-        Page(title: "登录") {
-            Text(L("使用你已有的 erp.sex 账号")).foregroundStyle(.secondary)
-            Panel { VStack(spacing: 18) {
-                TextField(L("邮箱"), text: $email).keyboardType(.emailAddress).textContentType(.username).textInputAutocapitalization(.never).autocorrectionDisabled()
-                SecureField(L("密码"), text: $password).textContentType(.password)
-                TextField(L("二步验证码（未开启可留空）"), text: $totp).keyboardType(.numberPad).textContentType(.oneTimeCode)
-                VerificationView(action: "login", token: $token, reset: reset).frame(height: app.config["turnstileSiteKey"].string.isEmpty ? 0 : 110)
-                PrimaryButton(title: busy ? "正在登录…" : "登录") { login() }.disabled(busy || !ready || email.isEmpty || password.isEmpty)
-                Button(L("重试安全验证")) { token = ""; reset += 1 }
-            } }
-        }
+
+/// A scene-level curtain also covers sheets without dismissing their state.
+private struct PhonePortraitRequirement: UIViewRepresentable {
+    let background: UIColor
+    let foreground: UIColor
+    let title: String
+    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeUIView(context: Context) -> OrientationProbe {
+        let probe = OrientationProbe()
+        probe.changed = { [weak coordinator = context.coordinator] view in coordinator?.refresh(from: view) }
+        return probe
     }
-    private func login() {
-        busy = true
-        app.run {
-            defer { busy = false }
-            var body: [String: Any] = ["email": email.trimmingCharacters(in: .whitespacesAndNewlines), "password": password, "turnstileToken": token]
-            if !totp.isEmpty { body["totpCode"] = totp }
-            do { await app.api.syncWebCookies(); _ = try await app.api.request("/auth/login", method: "POST", body: body); password = ""; await app.reloadSession(); dismiss() }
-            catch { token = ""; reset += 1; throw error }
+    func updateUIView(_ view: OrientationProbe, context: Context) {
+        context.coordinator.background = background
+        context.coordinator.foreground = foreground
+        context.coordinator.title = title
+        context.coordinator.refresh(from: view)
+    }
+    static func dismantleUIView(_ view: OrientationProbe, coordinator: Coordinator) { coordinator.curtain?.isHidden = true; coordinator.curtain = nil }
+    final class OrientationProbe: UIView {
+        var changed: ((UIView) -> Void)?
+        override func didMoveToWindow() { super.didMoveToWindow(); changed?(self) }
+        override func layoutSubviews() { super.layoutSubviews(); changed?(self) }
+    }
+    final class Coordinator {
+        var curtain: UIWindow?
+        var background = UIColor.systemBackground
+        var foreground = UIColor.label
+        var title = ""
+        private let label = UILabel()
+        func refresh(from view: UIView) {
+            guard UIDevice.current.userInterfaceIdiom == .phone, let scene = view.window?.windowScene else { return }
+            let bounds = scene.coordinateSpace.bounds
+            guard LayoutMetrics.requiresPortrait(isPhone: true, width: bounds.width, height: bounds.height) else { curtain?.isHidden = true; return }
+            if curtain == nil {
+                let window = UIWindow(windowScene: scene)
+                window.windowLevel = .alert + 1
+                let controller = UIViewController()
+                controller.view.accessibilityViewIsModal = true
+                let icon = UIImageView(image: UIImage(systemName: "iphone.gen3"))
+                icon.contentMode = .scaleAspectFit
+                icon.heightAnchor.constraint(equalToConstant: 62).isActive = true
+                label.font = .preferredFont(forTextStyle: .title2)
+                label.adjustsFontForContentSizeCategory = true
+                label.numberOfLines = 0
+                label.textAlignment = .center
+                let stack = UIStackView(arrangedSubviews: [icon, label])
+                stack.axis = .vertical; stack.spacing = 20; stack.translatesAutoresizingMaskIntoConstraints = false
+                controller.view.addSubview(stack)
+                NSLayoutConstraint.activate([stack.centerXAnchor.constraint(equalTo: controller.view.centerXAnchor), stack.centerYAnchor.constraint(equalTo: controller.view.centerYAnchor), stack.leadingAnchor.constraint(greaterThanOrEqualTo: controller.view.leadingAnchor, constant: 24), stack.trailingAnchor.constraint(lessThanOrEqualTo: controller.view.trailingAnchor, constant: -24)])
+                window.rootViewController = controller
+                curtain = window
+            }
+            curtain?.frame = bounds
+            curtain?.rootViewController?.view.backgroundColor = background
+            curtain?.tintColor = foreground
+            label.textColor = foreground; label.text = title
+            curtain?.isHidden = false
         }
     }
 }

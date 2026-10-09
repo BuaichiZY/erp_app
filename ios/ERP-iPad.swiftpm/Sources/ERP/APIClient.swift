@@ -85,7 +85,7 @@ struct APIError: LocalizedError {
         var fields = options; fields["purpose"] = purpose; fields["matchId"] = matchID
         var bytes = Data()
         for (name, value) in fields { bytes.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(name)\"\r\n\r\n\(value)\r\n".utf8)) }
-        let ext = mime.hasPrefix("audio/") ? "m4a" : "jpg"
+        let ext = mime == "image/png" ? "png" : mime == "audio/mpeg" ? "mp3" : mime.hasPrefix("audio/") ? "m4a" : "jpg"
         bytes.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"attachment.\(ext)\"\r\nContent-Type: \(mime)\r\n\r\n".utf8)); bytes.append(data); bytes.append(Data("\r\n--\(boundary)--\r\n".utf8))
         var req = authenticatedRequest(url: Self.origin.appendingPathComponent("api/v1/media")); req.httpMethod = "POST"; req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         let (data, response) = try await session.upload(for: req, from: bytes)

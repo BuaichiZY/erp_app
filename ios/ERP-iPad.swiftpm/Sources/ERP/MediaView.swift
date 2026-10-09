@@ -24,7 +24,7 @@ struct ImageUploadView: View {
         NavigationStack {
             Page(title: "传送图片") {
                 PhotosPicker(selection: $selected, matching: .images) {
-                    ZStack { RoundedRectangle(cornerRadius: 18).fill(Palette.secondary); RoundedRectangle(cornerRadius: 18).strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [5])).foregroundStyle(.secondary.opacity(0.35)); if let image { Image(uiImage: image).resizable().scaledToFit().padding(8) } else { VStack(spacing: 15) { Image(systemName: "photo.badge.plus").font(.largeTitle); Text(L("选择图片")).font(.headline); Text("JPEG / PNG / WebP / GIF").font(.caption) }.foregroundStyle(.secondary) } }.frame(height: 230)
+                    ZStack { RoundedRectangle(cornerRadius: 18).fill(app.palette.secondary); RoundedRectangle(cornerRadius: 18).strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [5])).foregroundStyle(.secondary.opacity(0.35)); if let image { Image(uiImage: image).resizable().scaledToFit().padding(8) } else { VStack(spacing: 15) { Image(systemName: "photo.badge.plus").font(.largeTitle); Text(L("选择图片")).font(.headline); Text("JPEG / PNG / WebP / GIF").font(.caption) }.foregroundStyle(.secondary) } }.frame(height: 230)
                 }.disabled(busy)
                 Label(L("上传时会清除图片中继资料。"), systemImage: "info.circle").font(.caption).foregroundStyle(.secondary)
                 Toggle(L("这是真人照片"), isOn: $realPerson).onChange(of: realPerson) { on in if on { rating = "general" } }
@@ -32,7 +32,7 @@ struct ImageUploadView: View {
                 Text(L("内容分级 *")).font(.headline)
                 HStack(spacing: 8) {
                     ForEach([("general", "全年龄", "日常照、合照"), ("suggestive", "擦边", "泳装、内衣、暗示姿势"), ("r18", "R18", "裸露、性行为")], id: \.0) { option in
-                        Button { rating = option.0 } label: { VStack(spacing: 7) { Text(L(option.1)).font(.headline); Text(L(option.2)).font(.caption).foregroundStyle(.secondary) }.frame(maxWidth: .infinity).frame(height: 85).background(Palette.surface, in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(rating == option.0 ? app.accent : .secondary.opacity(0.25), lineWidth: 2)) }.buttonStyle(.plain).disabled(realPerson && option.0 != "general")
+                        Button { rating = option.0 } label: { VStack(spacing: 7) { Text(L(option.1)).font(.headline); Text(L(option.2)).font(.caption).foregroundStyle(.secondary) }.frame(maxWidth: .infinity).frame(height: 85).background(app.palette.surface, in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(rating == option.0 ? app.accent : .secondary.opacity(0.25), lineWidth: 2)) }.buttonStyle(.plain).disabled(realPerson && option.0 != "general")
                     }
                 }
                 if rating == "r18" { Picker(L("R18 内容类型"), selection: $kind) { Text(L("成人内容")).tag("sexual"); Text(L("血腥内容")).tag("gore") }.pickerStyle(.segmented); Toggle(L("我确认内容为成年人"), isOn: $adult) }
@@ -79,7 +79,8 @@ struct ImageUploadView: View {
 struct VoiceRecordView: View {
     @EnvironmentObject private var app: AppState
     @Environment(\.dismiss) private var dismiss
-    let matchID: String
+    let matchID: String?
+    var purpose = "chat_voice"
     let accepted: (JSON) -> Void
     @StateObject private var recorder = VoiceRecorder()
     @State private var busy = false
@@ -93,5 +94,5 @@ struct VoiceRecordView: View {
         Button(L("选择已有音频")) { importing = true }.disabled(busy)
         Button(L("关闭")) { dismiss() }.disabled(busy)
     }.padding(25).onDisappear { recorder.clear() }.fileImporter(isPresented: $importing, allowedContentTypes: [.audio]) { result in app.run { let url = try result.get(); upload(url) } }.interactiveDismissDisabled(busy) }
-    private func upload(_ url: URL) { busy = true; app.run { defer { busy = false }; let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }; let asset = AVURLAsset(url: url); let duration = try await asset.load(.duration).seconds; guard duration >= 1, duration <= 121 else { throw APIError(status: 0, message: L("语音长度须为 1 秒至 2 分钟")) }; let input = try Data(contentsOf: url); let mime = url.pathExtension.lowercased() == "mp3" ? "audio/mpeg" : "audio/mp4"; let media = try await app.api.upload(input, mime: mime, purpose: "chat_voice", matchID: matchID, options: ["rating": "general"]); accepted(media); dismiss() } }
+    private func upload(_ url: URL) { busy = true; app.run { defer { busy = false }; let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }; let asset = AVURLAsset(url: url); let duration = try await asset.load(.duration).seconds; guard duration >= 1, duration <= 121 else { throw APIError(status: 0, message: L("语音长度须为 1 秒至 2 分钟")) }; let input = try Data(contentsOf: url); let mime = url.pathExtension.lowercased() == "mp3" ? "audio/mpeg" : "audio/mp4"; let media = try await app.api.upload(input, mime: mime, purpose: purpose, matchID: matchID, options: ["rating": "general"]); accepted(media); dismiss() } }
 }

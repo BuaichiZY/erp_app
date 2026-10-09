@@ -40,7 +40,7 @@ indirect enum JSON: Codable, Hashable, Identifiable {
 enum ERPRules {
     static func profileID(_ raw: String) -> String? {
         guard let c = URLComponents(string: raw), c.scheme == "https", c.host == "erp.sex", c.user == nil, c.port == nil || c.port == 443 else { return nil }
-        let id = c.queryItems?.first(where: { $0.name == "u" })?.value ?? (c.path.hasPrefix("/profiles/") ? String(c.path.dropFirst(10)) : "")
+        let id = c.queryItems?.first(where: { $0.name == "u" })?.value ?? (["/profiles/", "/u/", "/s/"].first(where: { c.path.hasPrefix($0) }).map { String(c.path.dropFirst($0.count)) } ?? "")
         return id.range(of: "^[A-Za-z0-9_-]{1,100}$", options: .regularExpression) == nil ? nil : id
     }
     static func swipe(x: Double, y: Double) -> String? {
@@ -64,5 +64,27 @@ enum ERPRules {
         if a.1.isEmpty { return !b.1.isEmpty }
         if b.1.isEmpty { return false }
         return a.1 > b.1
+    }
+}
+
+// Convert only at the API boundary so editing nested fields preserves unedited values.
+extension JSON {
+    var foundation: Any {
+        switch self {
+        case .object(let values): return values.mapValues { $0.foundation }
+        case .array(let values): return values.map { $0.foundation }
+        case .string(let value): return value
+        case .number(let value): return value
+        case .bool(let value): return value
+        case .null: return NSNull()
+        }
+    }
+    var records: [JSON] { if case .array = self { return array }; return self["items"].array }
+    func value(at path: [String]) -> JSON { path.reduce(self) { $0[$1] } }
+    func replacing(at path: [String], with value: JSON) -> JSON {
+        guard let first = path.first else { return value }
+        var values = object
+        values[first] = self[first].replacing(at: Array(path.dropFirst()), with: value)
+        return .object(values)
     }
 }

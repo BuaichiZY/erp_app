@@ -15,12 +15,14 @@ jobs:
           brew install xcodegen
           cd ios
           xcodegen generate
+      - name: Check layout and feature rules
+        run: python3 ios/check-layout.py
       - name: Build iPhone and iPad simulator app
         run: xcodebuild -project ios/ERP.xcodeproj -scheme ERP -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath ios/DerivedData CODE_SIGNING_ALLOWED=NO build
       - name: Archive iPhone and iPad device app without signing
         run: xcodebuild -project ios/ERP.xcodeproj -scheme ERP -configuration Release -destination 'generic/platform=iOS' -archivePath ios/ERP.xcarchive CODE_SIGNING_ALLOWED=NO archive
       - name: Package unsigned IPA for personal signing
-        run: python3 ios/package-unsigned-ipa.py ios/ERP.xcarchive ios/ERP-1.3.0-unsigned.ipa
+        run: python3 ios/package-unsigned-ipa.py ios/ERP.xcarchive ios/ERP-1.4.5-build9-unsigned.ipa
       - name: Validate iPad Playground package
         run: |
           for file in ios/ERP/*.swift; do cmp "$file" "ios/ERP-iPad.swiftpm/Sources/ERP/$(basename "$file")"; done
@@ -35,5 +37,5 @@ jobs:
             ios/ERP.xcodeproj
             ios/DerivedData/Build/Products/Debug-iphonesimulator/ERP.app
             ios/ERP.xcarchive
-            ios/ERP-1.3.0-unsigned.ipa
+            ios/ERP-1.4.5-build9-unsigned.ipa
           if-no-files-found: warn

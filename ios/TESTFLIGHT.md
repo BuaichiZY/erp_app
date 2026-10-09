@@ -23,6 +23,6 @@
 
 本机已在仓库根目录的 `.signing/` 生成 `ERP_Distribution.certSigningRequest` 及对应的 `ERP_Distribution.key`。如需新建 Apple Distribution 证书，把前者上传至 Apple Developer 的证书创建页面，下载 `.cer` 后运行 `powershell -File ios/finish-distribution-certificate.ps1 -CertificatePath '下载的证书绝对路径'`，即可在同目录生成 `.p12`。**私钥和 `.p12` 不应上传到 GitHub 仓库。** 如已有可用的 Apple Distribution `.p12`，可以直接使用，无需新建证书。
 
-配置完成后，在已包含 iOS 源码的提交上创建 `testflight/1.3.0-1` 形式的 tag 并推送，或在 GitHub Actions 手动运行 `TestFlight upload`。上传成功后，等待 Apple 处理构建，再到 App Store Connect 的 TestFlight 标签将构建加入内部测试组并邀请测试者。首次外部测试可能需要 Apple 的 Beta App Review。
+配置完成后，在已包含 iOS 源码的提交上创建 `testflight/1.4.0-2` 形式的 tag 并推送，或在 GitHub Actions 手动运行 `TestFlight upload`。上传成功后，等待 Apple 处理构建，再到 App Store Connect 的 TestFlight 标签将构建加入内部测试组并邀请测试者。首次外部测试可能需要 Apple 的 Beta App Review。
 
 目前此仓库尚未配置上述机密，因此可完成设备版编译和未签名归档，但无法直接生成可安装的已签名 IPA，也无法向 TestFlight 上传。`ios/ERP-iPad.swiftpm` 可作为 iPad Swift Playgrounds 项目使用，但它与 TestFlight 分发是两条不同路径。

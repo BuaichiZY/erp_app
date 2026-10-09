@@ -3,23 +3,138 @@ import CryptoKit
 import ImageIO
 import WebKit
 
-enum Palette {
-    static let surface = Color(uiColor: .secondarySystemGroupedBackground)
-    static let secondary = Color(uiColor: .tertiarySystemGroupedBackground)
-    static let background = Color(uiColor: .systemGroupedBackground)
+struct Palette {
+    let pop: Bool
+    private func adaptive(_ light: UInt32, _ dark: UInt32) -> Color {
+        Color(uiColor: UIColor { traits in
+            let hex = traits.userInterfaceStyle == .dark ? dark : light
+            return UIColor(red: CGFloat((hex >> 16) & 255) / 255, green: CGFloat((hex >> 8) & 255) / 255, blue: CGFloat(hex & 255) / 255, alpha: 1)
+        })
+    }
+    var surface: Color { adaptive(0xffffff, pop ? 0x271a47 : 0x181b22) }
+    var secondary: Color { adaptive(pop ? 0xfff3c4 : 0xeef0f4, pop ? 0x34245d : 0x22262e) }
+    var background: Color { adaptive(pop ? 0xffeb7a : 0xf5f6f9, pop ? 0x1b1233 : 0x101217) }
+    var text: Color { adaptive(pop ? 0x141415 : 0x20232a, pop ? 0xfefeff : 0xf5f5f7) }
+    var muted: Color { adaptive(pop ? 0x4d4d4d : 0x737986, pop ? 0xcfc4ec : 0x9ba0ad) }
+    var selection: Color { pop ? adaptive(0x141414, 0xff3e9a) : surface }
+    var selectionText: Color { pop ? .white : text }
+    var energy: Color { Color(hex: pop ? 0x7fe3fa : 0xffc83d) }
+    var border: Color { adaptive(pop ? 0x141414 : 0xdfe2e7, pop ? 0x0b0618 : 0x30333c) }
 }
+
+/// The website's Pop style uses a hard outline and an unblurred, short offset shadow.
+private struct SiteOutline<S: Shape>: ViewModifier {
+    @EnvironmentObject private var app: AppState
+    let shape: S
+    let shadow: Bool
+    let normalBorder: Bool
+    func body(content: Content) -> some View {
+        content.overlay { shape.stroke(app.palette.pop || normalBorder ? app.palette.border : .clear, lineWidth: app.palette.pop ? 2.5 : 1).allowsHitTesting(false) }
+            .background { if app.palette.pop && shadow { shape.fill(app.palette.border).offset(x: 3, y: 3).allowsHitTesting(false) } }
+    }
+}
+private struct SitePresentation: ViewModifier {
+    @EnvironmentObject private var app: AppState
+    func body(content: Content) -> some View { content.foregroundStyle(app.palette.text).presentationBackground(app.palette.background).preferredColorScheme(app.preferredScheme) }
+}
+extension View {
+    func sitePresentation() -> some View { modifier(SitePresentation()) }
+    func siteOutline<S: Shape>(_ shape: S, shadow: Bool = true, normalBorder: Bool = true) -> some View { modifier(SiteOutline(shape: shape, shadow: shadow, normalBorder: normalBorder)) }
+}
+
+struct SiteDivider: View {
+    @EnvironmentObject private var app: AppState
+    var body: some View { Rectangle().fill(app.palette.border).frame(height: 1).accessibilityHidden(true) }
+}
+
 struct Panel<Content: View>: View {
+    @EnvironmentObject private var app: AppState
     @ViewBuilder let content: Content
-    var body: some View { VStack(alignment: .leading, spacing: 12) { content }.padding(16).frame(maxWidth: .infinity, alignment: .leading).background(Palette.surface, in: RoundedRectangle(cornerRadius: 20)).overlay(RoundedRectangle(cornerRadius: 20).stroke(.secondary.opacity(0.18))) }
+    var body: some View { VStack(alignment: .leading, spacing: 12) { content }.padding(16).frame(maxWidth: .infinity, alignment: .leading).background(app.palette.surface, in: RoundedRectangle(cornerRadius: 20)).siteOutline(RoundedRectangle(cornerRadius: 20)) }
 }
 struct Page<Content: View>: View {
+    @EnvironmentObject private var app: AppState
     let title: String
+    var maximumWidth: CGFloat? = nil
     @ViewBuilder let content: Content
-    var body: some View { ScrollView { VStack(alignment: .leading, spacing: 18) { if !title.isEmpty { Text(L(title)).font(.largeTitle.bold()).padding(.vertical, 8) }; content }.padding(UIDevice.current.userInterfaceIdiom == .pad ? 24 : 18).frame(maxWidth: UIDevice.current.userInterfaceIdiom == .pad ? 1060 : 850).frame(maxWidth: .infinity) }.background(Palette.background) }
+    var body: some View {
+        GeometryReader { geometry in
+            let layout = LayoutMetrics(width: geometry.size.width)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    if !title.isEmpty { Text(L(title)).font(.largeTitle.bold()).padding(.vertical, 8) }
+                    content
+                }
+                .environment(\.pageLayout, layout)
+                .padding(layout.pagePadding)
+                .frame(maxWidth: maximumWidth.map { min($0, layout.pageWidth) } ?? layout.pageWidth)
+                .frame(maxWidth: .infinity)
+            }.background(app.palette.background)
+        }
+    }
+}
+private struct PageLayoutKey: EnvironmentKey {
+    static let defaultValue = LayoutMetrics(width: 390)
+}
+extension EnvironmentValues {
+    var pageLayout: LayoutMetrics {
+        get { self[PageLayoutKey.self] }
+        set { self[PageLayoutKey.self] = newValue }
+    }
+}
+
+/// Equal columns fitted to the actual content area, including narrow iPad sheets.
+struct ResponsiveGrid<Content: View>: View {
+    @Environment(\.pageLayout) private var layout
+    let minimum: CGFloat
+    var spacing: CGFloat = 16
+    var compactMinimum: CGFloat? = nil
+    @ViewBuilder let content: Content
+    var body: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: spacing, alignment: .top), count: layout.gridColumns(minimum: layout.contentWidth < 600 ? compactMinimum ?? minimum : minimum, spacing: spacing)), spacing: spacing) {
+            content
+        }
+    }
 }
 struct Dot: View {
     var count = 0
-    var body: some View { Group { if count > 0 { Text(count > 99 ? "99+" : String(count)).font(.caption2.bold()).foregroundStyle(.white).padding(5).background(.red, in: Capsule()) } else { Circle().fill(.red).frame(width: 8, height: 8) } } }
+    @ScaledMetric(relativeTo: .caption2) private var diameter: CGFloat = 22
+    var body: some View {
+        Group {
+            if count > 0 {
+                Text(count > 99 ? "99+" : String(count))
+                    .font(.caption2.bold()).foregroundStyle(.white)
+                    .padding(.horizontal, 5)
+                    .frame(minWidth: diameter, minHeight: diameter)
+                    .background(.red, in: Capsule())
+            } else {
+                Circle().fill(.red).frame(width: 8, height: 8)
+            }
+        }.fixedSize()
+    }
+}
+struct WrappingLayout: Layout {
+    var spacing: CGFloat = 8
+    private func frames(width: CGFloat, subviews: Subviews) -> ([CGRect], CGFloat) {
+        var frames: [CGRect] = [], x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0
+        for view in subviews {
+            let ideal = view.sizeThatFits(.unspecified)
+            let size = view.sizeThatFits(ProposedViewSize(width: min(width, ideal.width), height: nil))
+            if x > 0 && x + size.width > width { x = 0; y += rowHeight + spacing; rowHeight = 0 }
+            frames.append(CGRect(x: x, y: y, width: size.width, height: size.height))
+            x += size.width + spacing; rowHeight = max(rowHeight, size.height)
+        }
+        return (frames, y + rowHeight)
+    }
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = max(1, proposal.width ?? subviews.reduce(0) { $0 + $1.sizeThatFits(.unspecified).width + spacing })
+        return CGSize(width: width, height: frames(width: width, subviews: subviews).1)
+    }
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for (view, frame) in zip(subviews, frames(width: bounds.width, subviews: subviews).0) {
+            view.place(at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY), anchor: .topLeading, proposal: ProposedViewSize(frame.size))
+        }
+    }
 }
 struct MenuRow: View {
     @EnvironmentObject private var app: AppState
@@ -30,10 +145,10 @@ struct MenuRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 14) {
-                Image(systemName: icon).font(.title3).foregroundStyle(app.accent).frame(width: 44, height: 44).background(app.accent.opacity(0.16), in: RoundedRectangle(cornerRadius: 14))
-                VStack(alignment: .leading, spacing: 4) { Text(L(title)).font(.headline); if !subtitle.isEmpty { Text(L(subtitle)).font(.caption).foregroundStyle(.secondary) } }
-                Spacer(); if let badge { Dot(count: badge) }; Image(systemName: "chevron.right").foregroundStyle(.secondary)
-            }.padding(16).foregroundStyle(.primary)
+                Image(systemName: icon).font(.title3).foregroundStyle(app.palette.pop ? app.palette.muted : app.accent).frame(width: app.palette.pop ? 28 : 44, height: 44).background(app.accent.opacity(app.palette.pop ? 0 : 0.16), in: RoundedRectangle(cornerRadius: 14))
+                VStack(alignment: .leading, spacing: 4) { Text(L(title)).font(.headline); if !subtitle.isEmpty { Text(L(subtitle)).font(.caption).foregroundStyle(app.palette.muted) } }
+                Spacer(); if let badge { Dot(count: badge) }; Image(systemName: "chevron.right").foregroundStyle(app.palette.muted)
+            }.padding(16).foregroundStyle(app.palette.text)
         }.buttonStyle(.plain)
     }
 }
@@ -42,11 +157,12 @@ struct PrimaryButton: View {
     let title: String
     var icon: String? = nil
     let action: () -> Void
-    var body: some View { Button(action: action) { HStack { if let icon { Image(systemName: icon) }; Text(L(title)).fontWeight(.semibold) }.frame(maxWidth: .infinity).padding(15).foregroundStyle(.white).background(app.accent.gradient, in: Capsule()) }.buttonStyle(.plain) }
+    var body: some View { Button(action: action) { HStack { if let icon { Image(systemName: icon) }; Text(L(title)).fontWeight(.semibold) }.frame(maxWidth: .infinity).padding(15).foregroundStyle(.white).background(app.accent, in: RoundedRectangle(cornerRadius: app.palette.pop ? 14 : 28)).siteOutline(RoundedRectangle(cornerRadius: app.palette.pop ? 14 : 28), normalBorder: false) }.buttonStyle(.plain) }
 }
 struct EmptyState: View {
+    @EnvironmentObject private var app: AppState
     var title = "暂无内容"
-    var body: some View { VStack(spacing: 14) { Image(systemName: "tray").font(.largeTitle).foregroundStyle(.secondary); Text(L(title)).foregroundStyle(.secondary) }.frame(maxWidth: .infinity).padding(40) }
+    var body: some View { VStack(spacing: 14) { Image(systemName: "tray").font(.largeTitle).foregroundStyle(app.palette.muted); Text(L(title)).foregroundStyle(app.palette.muted) }.frame(maxWidth: .infinity).padding(40) }
 }
 
 actor ImageStore {
@@ -93,29 +209,29 @@ struct RemoteImage: View {
     let media: JSON
     var size = 1000
     var thumbnail = false
+    var fit = false
     @State private var image: UIImage?
     @State private var failed = false
-    private var url: URL? {
-        guard media["view"].string.isEmpty || media["view"].string == "show" else { return nil }
-        let value = thumbnail && !media["thumbUrl"].string.isEmpty ? media["thumbUrl"].string : !media["url"].string.isEmpty ? media["url"].string : media["thumbUrl"].string
-        guard let url = URL(string: value), url.scheme == "https" else { return nil }; return url
-    }
+    @State private var requestID = UUID()
+    private var url: URL? { MediaVisibility.imageURL(media, thumbnail: thumbnail) }
     private var scope: String { app.me.id + "|" + app.mode }
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                Palette.secondary
-                if let image { Image(uiImage: image).resizable().scaledToFill().transition(.opacity) }
+                app.palette.secondary
+                if let image { Image(uiImage: image).resizable().aspectRatio(contentMode: fit ? .fit : .fill).transition(.opacity) }
                 else if url != nil && !failed { ProgressView() }
-                else { Image(systemName: "photo").foregroundStyle(.secondary) }
+                else { Image(systemName: "photo").foregroundStyle(app.palette.muted) }
             }.frame(width: geometry.size.width, height: geometry.size.height).clipped()
+                .contentShape(Rectangle())
         }.task(id: scope + (url?.absoluteString ?? "") + String(size)) {
+            let generation = UUID(); requestID = generation
             image = nil; failed = false; guard let url else { return }
             do {
-                if !thumbnail, let preview = URL(string: media["thumbUrl"].string), preview.scheme == "https", preview != url { image = try? await ImageStore.shared.image(preview, size: 400, scope: scope) }
+                if media["view"].string != "blur", !thumbnail, let preview = URL(string: media["thumbUrl"].string), preview.scheme == "https", preview != url { let value = try? await ImageStore.shared.image(preview, size: 400, scope: scope); if !Task.isCancelled && requestID == generation { image = value } }
                 let value = try await ImageStore.shared.image(url, size: size, scope: scope)
-                if !Task.isCancelled { withAnimation(.easeOut(duration: 0.2)) { image = value } }
-            } catch { failed = true }
+                if !Task.isCancelled && requestID == generation { withAnimation(.easeOut(duration: 0.2)) { image = value } }
+            } catch { if !Task.isCancelled && requestID == generation { failed = true } }
         }
     }
 }
@@ -127,6 +243,23 @@ struct Avatar: View {
 struct VerifiedBadge: View {
     @EnvironmentObject private var app: AppState
     var body: some View { Image(systemName: "checkmark.seal").font(.caption.bold()).foregroundStyle(app.accent).padding(.horizontal, 7).padding(.vertical, 4).background(app.accent.opacity(0.15), in: Capsule()).accessibilityLabel(L("已验证 VRChat 账号")) }
+}
+struct VRCIdentityBadge: View {
+    let user: JSON
+    var compact = true
+    var showPrefix = false
+    var body: some View {
+        if VRCTrust.verified(user) {
+            let key = VRCTrust.key(user)
+            HStack(spacing: 4) {
+                Image(systemName: "checkmark.seal.fill")
+                if !compact { Text((showPrefix && !key.isEmpty ? "VRC · " : "") + L(VRCTrust.label(key))) }
+            }.font(.caption.bold()).padding(.horizontal, 6).padding(.vertical, 4)
+                .foregroundStyle(VRCTrust.darkForeground(key) ? Color(hex: 0x111827) : .white)
+                .background(Color(hex: VRCTrust.background(key)), in: Capsule())
+                .fixedSize().accessibilityLabel(L(VRCTrust.label(key)))
+        }
+    }
 }
 
 struct VerificationView: UIViewRepresentable {
@@ -169,5 +302,54 @@ struct VerificationView: UIViewRepresentable {
             let url = navigationAction.request.url
             decisionHandler(url?.scheme == "about" || (url?.scheme == "https" && ["erp.sex", "challenges.cloudflare.com"].contains(url?.host ?? "")) ? .allow : .cancel)
         }
+    }
+}
+
+/// Faceted gemstone, matching the site's permanent-energy symbol.
+struct GemShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: rect.minX + x * rect.width, y: rect.minY + y * rect.height) }
+        var path = Path()
+        path.move(to: point(0.22, 0.12)); path.addLine(to: point(0.78, 0.12))
+        path.addLine(to: point(0.98, 0.4)); path.addLine(to: point(0.5, 0.95))
+        path.addLine(to: point(0.02, 0.4)); path.closeSubpath()
+        path.move(to: point(0.02, 0.4)); path.addLine(to: point(0.98, 0.4))
+        path.move(to: point(0.22, 0.12)); path.addLine(to: point(0.35, 0.4)); path.addLine(to: point(0.5, 0.95))
+        path.move(to: point(0.78, 0.12)); path.addLine(to: point(0.65, 0.4)); path.addLine(to: point(0.5, 0.95))
+        path.move(to: point(0.35, 0.4)); path.addLine(to: point(0.5, 0.12)); path.addLine(to: point(0.65, 0.4))
+        return path
+    }
+}
+struct EnergyGem: View {
+    @EnvironmentObject private var app: AppState
+    var body: some View { GemShape().stroke(app.accent, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)).frame(width: 18, height: 18).accessibilityHidden(true) }
+}
+
+/// Exclusive recognition sends exactly one action for a tap or a long press.
+struct SecretActionButton<Content: View>: View {
+    let action: () -> Void
+    var secretAction: (() -> Void)? = nil
+    @ViewBuilder let content: Content
+    var body: some View {
+        content.contentShape(Rectangle())
+            .gesture(LongPressGesture(minimumDuration: 0.5).exclusively(before: TapGesture()).onEnded { result in
+                switch result { case .first: (secretAction ?? action)(); case .second: action() }
+            })
+            .accessibilityAddTraits(.isButton).accessibilityAction { action() }
+            .accessibilityAction(named: Text(L("悄悄喜欢"))) { (secretAction ?? action)() }
+    }
+}
+struct LoadingSkeleton: View {
+    @EnvironmentObject private var app: AppState
+    var cards = false
+    @State private var pulse = false
+    var body: some View {
+        Group {
+            if cards {
+                ResponsiveGrid(minimum: 190, compactMinimum: 130) { ForEach(0..<6, id: \.self) { _ in RoundedRectangle(cornerRadius: 18).fill(app.palette.secondary).frame(height: 230) } }
+            } else {
+                VStack(spacing: 18) { ForEach(0..<3, id: \.self) { _ in HStack { Circle().fill(app.palette.secondary).frame(width: 48, height: 48); VStack(alignment: .leading, spacing: 12) { RoundedRectangle(cornerRadius: 5).fill(app.palette.secondary).frame(width: 150, height: 14); RoundedRectangle(cornerRadius: 5).fill(app.palette.secondary).frame(height: 10) }; Spacer() } } }.padding(16)
+            }
+        }.opacity(pulse ? 0.45 : 1).animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: pulse).onAppear { pulse = true }.accessibilityLabel(L("正在加载…"))
     }
 }

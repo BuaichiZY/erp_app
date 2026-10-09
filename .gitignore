@@ -26,3 +26,6 @@ ios/*.ipa
 ios/ExportOptions.plist
 ios/TestFlightExport/
 ios/*-build.log
+ios/ERP/Info.plist
+
+.DS_Store

@@ -5,20 +5,25 @@ enum Screen: String, Identifiable {
     case login, notifications, energy, settings, about, scan, share, editProfile, vrc, invite, membership, content, privacy, account, language, appearance, blocks, sanctions, sessions, password, notificationSettings
     var id: String { rawValue }
 }
-struct ProfileRoute: Identifiable { let id: String }
+struct ProfileRoute: Identifiable { let id: String; var readOnly = false }
 struct ChatRoute: Identifiable { let id: String }
 struct MatchResult: Identifiable { let user: JSON; let matchID: String; var id: String { user.id } }
 
 @MainActor final class AppState: ObservableObject {
     let api = APIClient()
+    let oauth = OAuthLogin()
     @Published var me: JSON = .null
     @Published var config: JSON = .null
     @Published var counters: JSON = .null
     @Published var energy: JSON = .null
     @Published var tab = 0
+    @Published var discoveryGrid = false
+    @Published var likesKind = "received"
     @Published var screen: Screen?
     @Published var profileRoute: ProfileRoute?
     @Published var chatRoute: ChatRoute?
+    @Published var postRoute: PostRoute?
+    private var pendingNotification: NotificationRoute = .none
     @Published var matched: MatchResult?
     @Published var message: String?
     @Published var mode = UserDefaults.standard.string(forKey: "contentMode") ?? "sfw"
@@ -27,17 +32,24 @@ struct MatchResult: Identifiable { let user: JSON; let matchID: String; var id: 
     @Published var update: JSON = .null
     @Published var firstRun = !UserDefaults.standard.bool(forKey: "introduced")
     @Published var eventSerial = 0
-    @Published var pins: [String] = []
     var socket: URLSessionWebSocketTask?
     private var realtimeTask: Task<Void, Never>?
-    var version: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.3.0" }
+    var version: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.4.5" }
     var authenticated: Bool { !me.id.isEmpty }
     var updateAvailable: Bool { update.exists }
     var localeCode: String { LanguageSupport.resolve(language, preferred: Locale.preferredLanguages) }
-    var accent: Color { mode == "nsfw" ? Color(hex: 0xff5793) : Color(hex: 0xff594f) }
+    var theme: ThemeRules { ThemeRules(mode: mode, config: config) }
+    var palette: Palette { Palette(pop: theme.pop) }
+    var accent: Color { Color(hex: theme.accent) }
+    var preferredScheme: ColorScheme? { appearance == "system" ? nil : theme.dark(preference: appearance, systemDark: false) ? .dark : .light }
     func prepare() async {
+        oauth.configure(api: api) { [weak self] user in
+            guard let self else { return }
+            self.me = user; await self.refreshCounters(); self.connectRealtime()
+            self.screen = nil
+        }
         let web = WKWebView(); if let ua = try? await web.evaluateJavaScript("navigator.userAgent") as? String { api.userAgent = ua }
-        await reloadSession(); await checkUpdate()
+        await reloadSession(); oauth.resume(); await checkUpdate()
     }
     func configure() {
         api.mode = mode; api.language = localeCode == "zh-Hant" ? "zh-TW" : localeCode == "zh-Hans" ? "zh-CN" : localeCode
@@ -47,7 +59,7 @@ struct MatchResult: Identifiable { let user: JSON; let matchID: String; var id: 
     func reloadSession() async {
         configure()
         do { config = try await api.request("/config", fresh: true) } catch { message = error.localizedDescription }
-        do { me = try await api.request("/me", fresh: true); loadPins(); await refreshCounters(); connectRealtime() }
+        do { me = try await api.request("/me", fresh: true);  await refreshCounters(); connectRealtime() }
         catch let error as APIError where error.status == 401 { me = .null; disconnectRealtime() }
         catch { message = error.localizedDescription }
     }
@@ -58,23 +70,39 @@ struct MatchResult: Identifiable { let user: JSON; let matchID: String; var id: 
         if let count = await count { counters = count }; if let amount = await amount { energy = amount }
     }
     func requireLogin() -> Bool { if authenticated { return true }; screen = .login; return false }
+    func openNotification(_ item: JSON) {
+        pendingNotification = NotificationRoute.resolve(item)
+        screen = nil
+    }
+    func finishNotificationNavigation() {
+        let route = pendingNotification; pendingNotification = .none
+        switch route {
+        case .likes: likesKind = "received"; tab = 1
+        case .chat(let id): tab = 2; chatRoute = ChatRoute(id: id)
+        case .profile(let id): profileRoute = ProfileRoute(id: id)
+        case .post(let id): tab = 3; postRoute = PostRoute(id: id)
+        case .vrc: screen = .vrc
+        case .membership: screen = .membership
+        case .editProfile: screen = .editProfile
+        case .settings: screen = .settings
+        case .matches: tab = 2
+        case .none: break
+        }
+    }
     func setMode(_ value: String) { mode = value; UserDefaults.standard.set(value, forKey: "contentMode"); configure(); api.invalidate(); eventSerial += 1; run { await self.refreshCounters() } }
     func setAppearance(_ value: String) { appearance = value; UserDefaults.standard.set(value, forKey: "appearance"); if authenticated { run { _ = try await self.api.request("/me/settings", method: "PATCH", body: ["colorScheme": value]) } } }
     func setLanguage(_ value: String) { language = value; UserDefaults.standard.set(value, forKey: "language"); configure(); api.invalidate(); eventSerial += 1 }
     func finishIntroduction() { UserDefaults.standard.set(true, forKey: "introduced"); firstRun = false }
-    func togglePin(_ id: String) {
-        if let index = pins.firstIndex(of: id) { pins.remove(at: index) } else { pins.append(id) }
-        UserDefaults.standard.set(pins, forKey: "pins." + me.id)
-    }
-    private func loadPins() { pins = UserDefaults.standard.stringArray(forKey: "pins." + me.id) ?? [] }
     func markRead(_ match: JSON) async throws {
         var last = match["lastMessage"]["id"].string
         if last.isEmpty { last = try await api.request("/matches/\(APIClient.encode(match.id))/messages?limit=1")["items"].array.first?.id ?? "" }
         if !last.isEmpty { _ = try await api.request("/matches/\(APIClient.encode(match.id))/read", method: "POST", body: ["lastMessageId": last]); await refreshCounters() }
     }
-    func swipe(_ user: JSON, _ action: String) async throws {
+    func swipe(_ user: JSON, _ action: String, secret: Bool = false) async throws {
         guard requireLogin() else { throw CancellationError() }
-        let result = try await api.request("/swipes", method: "POST", body: ["targetId": user.id, "action": action])
+        var payload: [String: Any] = ["targetId": user.id, "action": action]
+        if secret && action != "pass" { payload["secret"] = true }
+        let result = try await api.request("/swipes", method: "POST", body: payload)
         if result["matched"].bool { matched = MatchResult(user: user, matchID: result["match"].id) }
         await refreshCounters()
     }
@@ -103,7 +131,13 @@ struct MatchResult: Identifiable { let user: JSON; let matchID: String; var id: 
                         switch packet { case .string(let text): data = Data(text.utf8); case .data(let bytes): data = bytes; @unknown default: continue }
                         let json = try JSONDecoder().decode(JSON.self, from: data)
                         if json["type"].string == "ping" { try await socket.send(.string("{\"type\":\"pong\",\"data\":{}}")); continue }
-                        self.api.invalidate(); self.eventSerial += 1; await self.refreshCounters(); retry = 1
+                        let type = json["type"].string
+                        if type == "counters" { self.counters = json["data"] }
+                        else {
+                            if RealtimeRules.refreshesContent(type) { self.api.invalidate(); self.eventSerial += 1 }
+                            if type.hasPrefix("energy.") || type.hasPrefix("match.") || type.hasPrefix("notification.") { await self.refreshCounters() }
+                        }
+                        retry = 1
                     }
                 } catch { socket.cancel(with: .goingAway, reason: nil) }
                 if !Task.isCancelled { try? await Task.sleep(nanoseconds: min(retry, 30) * 1_000_000_000); retry *= 2 }

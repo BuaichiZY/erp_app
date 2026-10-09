@@ -20,6 +20,14 @@ def main() -> None:
     info = plistlib.loads((app / "Info.plist").read_bytes())
     if info.get("CFBundleIdentifier") != "sex.erp.ios":
         parser.error("The device archive has an unexpected bundle ID")
+    if sorted(info.get("UIDeviceFamily", [])) != [1, 2]:
+        parser.error("The archive must support both iPhone and iPad")
+    if "UILaunchScreen" not in info or "UIApplicationSceneManifest" not in info:
+        parser.error("The archive is missing its launch screen or scene declaration")
+    if not {"zh-Hans", "zh-Hant"}.issubset(info.get("CFBundleLocalizations", [])):
+        parser.error("The archive is missing Chinese localization declarations")
+    if len(info.get("UISupportedInterfaceOrientations~ipad", [])) != 4:
+        parser.error("The archive must support all four iPad orientations")
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with ZipFile(args.output, "w", compression=ZIP_DEFLATED, compresslevel=9) as ipa:
